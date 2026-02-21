@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>XcapeR</title>
+    <style>
+      :root {
+        --bg-1: #000000;
+        --bg-2: #000000;
+        --hud-bg: rgba(0, 0, 0, 0.45);
+        --text: #f4f7fb;
+        --accent: #e9c46a;
+        --muted: #8ea8c3;
+        --good: #6fcf97;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        touch-action: none;
+        background: #000;
+        color: var(--text);
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      }
+
+      #app {
+        position: fixed;
+        inset: 0;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .screen {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.08), transparent 45%),
+          radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.05), transparent 40%),
+          linear-gradient(140deg, #0b1622, #243b55 70%);
+        z-index: 20;
+      }
+
+      .panel {
+        width: min(26rem, 100%);
+        padding: 1.4rem;
+        border-radius: 14px;
+        background: rgba(6, 15, 24, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(6px);
+      }
+
+      .title {
+        margin: 0 0 0.25rem;
+        font-size: clamp(1.8rem, 8vw, 2.7rem);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .subtitle {
+        margin: 0 0 1rem;
+        color: var(--muted);
+      }
+
+      .menu {
+        display: grid;
+        gap: 0.65rem;
+      }
+
+      .btn {
+        width: 100%;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        padding: 0.85rem 1rem;
+        border-radius: 10px;
+      }
+
+      .btn:active {
+        transform: scale(0.985);
+      }
+
+      .btn-primary {
+        border-color: var(--accent);
+        background: rgba(233, 196, 106, 0.18);
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .hud {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 10;
+      }
+
+      .timer {
+        position: absolute;
+        top: 0.75rem;
+        left: 50%;
+        transform: translateX(-50%);
+        min-width: 8.3rem;
+        text-align: center;
+        padding: 0.42rem 0.7rem;
+        border-radius: 999px;
+        font-variant-numeric: tabular-nums;
+        background: var(--hud-bg);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+      }
+
+      .inventory {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        width: 2.6rem;
+        height: 2.6rem;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        background: var(--hud-bg);
+      }
+
+      .inventory::after {
+        content: "";
+        position: absolute;
+        inset: 0.4rem;
+        border-radius: 4px;
+        background: rgba(233, 196, 106, 0.2);
+        box-shadow: none;
+        transition: 150ms ease;
+      }
+
+      .inventory.active::after {
+        background: var(--accent);
+        box-shadow: 0 0 14px rgba(233, 196, 106, 0.85);
+      }
+
+      .status {
+        position: absolute;
+        left: 50%;
+        bottom: 1rem;
+        transform: translateX(-50%);
+        padding: 0.45rem 0.75rem;
+        border-radius: 999px;
+        background: var(--hud-bg);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        opacity: 0;
+        transition: opacity 150ms ease;
+      }
+
+      .status.visible {
+        opacity: 1;
+      }
+
+      .status.good {
+        border-color: rgba(111, 207, 151, 0.8);
+        color: var(--good);
+      }
+
+      .joystick-wrap {
+        position: absolute;
+        left: 0.8rem;
+        bottom: 0.8rem;
+        width: 8.8rem;
+        height: 8.8rem;
+        border-radius: 999px;
+        pointer-events: auto;
+        display: none;
+      }
+
+      .joystick-base {
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.24);
+      }
+
+      .joystick-knob {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 3.2rem;
+        height: 3.2rem;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(255, 255, 255, 0.28);
+        border: 1px solid rgba(255, 255, 255, 0.35);
+      }
+
+      @media (pointer: coarse) {
+        .joystick-wrap {
+          display: block;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <div id="hud" class="hud hidden">
+      <div id="timer" class="timer">00:00:00</div>
+      <div id="inventory" class="inventory" aria-label="Inventory slot"></div>
+      <div id="status" class="status"></div>
+      <div id="joystick" class="joystick-wrap" aria-label="Virtual joystick">
+        <div class="joystick-base"></div>
+        <div id="joystickKnob" class="joystick-knob"></div>
+      </div>
+    </div>
+
+    <div id="splash" class="screen">
+      <div class="panel">
+        <h1 class="title">XcapeR</h1>
+        <p class="subtitle">Level 1 Prototype</p>
+        <div class="menu">
+          <button id="startBtn" class="btn btn-primary">Start Game</button>
+          <button id="aboutBtn" class="btn">About</button>
+          <button id="optionsBtn" class="btn">Options</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="aboutModal" class="screen hidden">
+      <div class="panel">
+        <h2 class="title" style="font-size: 1.55rem">About XcapeR</h2>
+        <p class="subtitle" style="margin-bottom: 1.1rem">
+          Find the key in the room, then unlock the front door to escape.
+        </p>
+        <button id="aboutCloseBtn" class="btn btn-primary">Back</button>
+      </div>
+    </div>
+
+    <div id="optionsModal" class="screen hidden">
+      <div class="panel">
+        <h2 class="title" style="font-size: 1.55rem">Options</h2>
+        <p class="subtitle" style="margin-bottom: 1.1rem">
+          Options will be implemented in a later step.
+        </p>
+        <button id="optionsCloseBtn" class="btn btn-primary">Back</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/client/main.ts"></script>
+  </body>
+</html>
