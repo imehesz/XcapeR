@@ -1,79 +1,77 @@
 import * as THREE from 'three';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { gsap } from 'gsap';
 
 export class Door {
   public readonly mesh: any;
+  private readonly root: any;
   private readonly pivot: any;
-  private readonly hingeX = -0.8;
+  private readonly hingeX = -0.79;
 
   constructor() {
-    const fallbackMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(1.6, 2.6, 0.3),
-      new THREE.MeshStandardMaterial({ color: 0x7c4628 })
-    );
+    const frameWidth = 1.86;
+    const frameThickness = 0.14;
+    const openingWidth = 1.58;
+    const openingHeight = 2.58;
 
-    fallbackMesh.position.set(0.8, 1.3, 0);
-    this.mesh = fallbackMesh;
+    const frameMaterial = new THREE.MeshStandardMaterial({
+      color: 0x5f4232,
+      roughness: 0.9,
+      metalness: 0.05,
+      flatShading: true
+    });
+    const doorMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8d5f3b,
+      roughness: 0.88,
+      metalness: 0.05,
+      flatShading: true
+    });
+    const metalMaterial = new THREE.MeshStandardMaterial({
+      color: 0xb8a46a,
+      roughness: 0.4,
+      metalness: 0.75,
+      flatShading: true
+    });
+
+    this.root = new THREE.Group();
+    const frameGroup = new THREE.Group();
+    const doorLeafGroup = new THREE.Group();
+
+    // Leaf pivots from the left edge (hinge).
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(openingWidth, openingHeight, 0.22), doorMaterial);
+    panel.position.set(openingWidth * 0.5, openingHeight * 0.5, 0);
+    doorLeafGroup.add(panel);
+    this.mesh = panel;
+
+    const topBeam = new THREE.Mesh(new THREE.BoxGeometry(frameWidth, 0.16, 0.32), frameMaterial);
+    topBeam.position.set(0, 2.68, 0);
+    frameGroup.add(topBeam);
+
+    const leftPost = new THREE.Mesh(new THREE.BoxGeometry(frameThickness, 2.64, 0.32), frameMaterial);
+    leftPost.position.set(-0.86, 1.32, 0);
+    frameGroup.add(leftPost);
+
+    const rightPost = new THREE.Mesh(new THREE.BoxGeometry(frameThickness, 2.64, 0.32), frameMaterial);
+    rightPost.position.set(0.86, 1.32, 0);
+    frameGroup.add(rightPost);
+
+    const insetPanel = new THREE.Mesh(new THREE.BoxGeometry(1.12, 1.84, 0.08), frameMaterial);
+    insetPanel.position.set(openingWidth * 0.5, openingHeight * 0.51, 0.09);
+    doorLeafGroup.add(insetPanel);
+
+    const knob = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), metalMaterial);
+    knob.position.set(1.42, 1.28, 0.14);
+    doorLeafGroup.add(knob);
 
     this.pivot = new THREE.Group();
-    this.pivot.add(fallbackMesh);
+    this.pivot.add(doorLeafGroup);
     this.pivot.position.set(this.hingeX, 0, 0);
 
-    this.loadMedievalDoor(fallbackMesh);
+    this.root.add(frameGroup);
+    this.root.add(this.pivot);
   }
 
   get object3D(): any {
-    return this.pivot;
-  }
-
-  private loadMedievalDoor(fallbackMesh: any): void {
-    const objUrl = new URL('../../../assets/models/door_medieval/door.obj', import.meta.url).href;
-    const textureUrl = new URL('../../../assets/models/door_medieval/door.png', import.meta.url).href;
-
-    const texture = new THREE.TextureLoader().load(textureUrl);
-    texture.colorSpace = THREE.SRGBColorSpace;
-
-    const loader = new OBJLoader();
-    loader.load(
-      objUrl,
-      (object: any) => {
-        const initialBounds = new THREE.Box3().setFromObject(object);
-        const initialSize = initialBounds.getSize(new THREE.Vector3());
-        if (initialSize.x <= 0.0001 || initialSize.y <= 0.0001) {
-          return;
-        }
-
-        let uniformScale = 1.6 / initialSize.x;
-        if (initialSize.y * uniformScale > 2.9) {
-          uniformScale = 2.9 / initialSize.y;
-        }
-        object.scale.setScalar(uniformScale);
-
-        const fittedBounds = new THREE.Box3().setFromObject(object);
-        const fittedCenter = fittedBounds.getCenter(new THREE.Vector3());
-        object.position.set(-fittedBounds.min.x, -fittedBounds.min.y, -fittedCenter.z);
-
-        object.traverse((child: any) => {
-          if (!(child instanceof THREE.Mesh)) {
-            return;
-          }
-
-          child.material = new THREE.MeshStandardMaterial({
-            map: texture,
-            roughness: 0.82,
-            metalness: 0.04
-          });
-        });
-
-        this.pivot.remove(fallbackMesh);
-        this.pivot.add(object);
-      },
-      undefined,
-      () => {
-        // Keep fallback mesh when medieval model fails to load.
-      }
-    );
+    return this.root;
   }
 
   open(): Promise<void> {
@@ -92,17 +90,18 @@ export class Door {
   }
 
   lockedShake(): void {
+    const originX = this.root.position.x;
     gsap.fromTo(
-      this.pivot.position,
-      { x: this.hingeX - 0.06 },
+      this.root.position,
+      { x: originX - 0.06 },
       {
-        x: this.hingeX + 0.06,
+        x: originX + 0.06,
         duration: 0.05,
         repeat: 4,
         yoyo: true,
         ease: 'power1.inOut',
         onComplete: () => {
-          this.pivot.position.x = this.hingeX;
+          this.root.position.x = originX;
         }
       }
     );
@@ -110,13 +109,12 @@ export class Door {
 
   reset(): void {
     gsap.killTweensOf(this.pivot.rotation);
-    gsap.killTweensOf(this.pivot.position);
+    gsap.killTweensOf(this.root.position);
     this.pivot.rotation.y = 0;
-    this.pivot.position.x = this.hingeX;
   }
 
   dispose(): void {
-    this.pivot.traverse((child: any) => {
+    this.root.traverse((child: any) => {
       if (!(child instanceof THREE.Mesh)) {
         return;
       }

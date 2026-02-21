@@ -124,7 +124,7 @@ export const LEVELS: LevelConfig[] = [
         id: 'door.exit',
         type: 'door',
         transform: {
-          position: { x: 0, y: 0, z: -4.45 },
+          position: { x: 0, y: 0, z: -4.9 },
           rotationY: 0,
           scale: 1
         },
@@ -210,7 +210,7 @@ export const LEVELS: LevelConfig[] = [
         id: 'door.exit',
         type: 'door',
         transform: {
-          position: { x: 0, y: 0, z: -4.45 },
+          position: { x: 0, y: 0, z: -4.9 },
           rotationY: 0,
           scale: 1
         },
@@ -257,7 +257,5 @@ export const collectLevelAssetUrls = (levels: LevelConfig[]): string[] => {
       urls.add(level.custom.catMeowUrl);
     }
   }
-  urls.add(assetUrl('models/door_medieval/door.obj'));
-  urls.add(assetUrl('models/door_medieval/door.png'));
   return [...urls];
 };
