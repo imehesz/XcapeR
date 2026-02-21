@@ -64,8 +64,8 @@ const roomCollision: RoomCollisionConfig = {
   closedDoorBounds: {
     minX: -0.95,
     maxX: 0.95,
-    minZ: 4.05,
-    maxZ: 4.9
+    minZ: -4.9,
+    maxZ: -4.05
   }
 };
 
@@ -156,18 +156,28 @@ floor.rotation.x = -Math.PI / 2;
 floor.position.y = 0;
 scene.add(floor);
 
-const roomFrame = new THREE.Mesh(
-  new THREE.BoxGeometry(ROOM_HALF * 2, WALL_HEIGHT, ROOM_HALF * 2),
-  new THREE.MeshStandardMaterial({
-    color: 0x4a617f,
-    transparent: true,
-    opacity: 0.24,
-    side: THREE.DoubleSide,
-    roughness: 1
-  })
+const wallMaterial = new THREE.MeshStandardMaterial({
+  color: 0x4a617f,
+  transparent: true,
+  opacity: 0.24,
+  side: THREE.DoubleSide,
+  roughness: 1
+});
+
+const wallThickness = 0.12;
+const leftWall = new THREE.Mesh(
+  new THREE.BoxGeometry(wallThickness, WALL_HEIGHT, ROOM_HALF * 2),
+  wallMaterial
 );
-roomFrame.position.set(0, WALL_HEIGHT * 0.5, 0);
-scene.add(roomFrame);
+leftWall.position.set(-ROOM_HALF, WALL_HEIGHT * 0.5, 0);
+scene.add(leftWall);
+
+const backWall = new THREE.Mesh(
+  new THREE.BoxGeometry(ROOM_HALF * 2, WALL_HEIGHT, wallThickness),
+  wallMaterial
+);
+backWall.position.set(0, WALL_HEIGHT * 0.5, -ROOM_HALF);
+scene.add(backWall);
 
 const grid = new THREE.GridHelper(ROOM_HALF * 2, 10, 0x3b4b63, 0x253246);
 grid.position.y = 0.01;
@@ -192,6 +202,7 @@ keyLight.position.set(LEVELS[0].keyPosition.x, 2.1, LEVELS[0].keyPosition.z);
 scene.add(keyLight);
 
 const door = new Door();
+door.object3D.position.z = -4.45;
 scene.add(door.object3D);
 
 const doorFrame = new THREE.Mesh(
@@ -199,6 +210,7 @@ const doorFrame = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ color: 0x3a2a22 })
 );
 doorFrame.position.set(0, 1.5, 4.47);
+doorFrame.position.z = -4.47;
 scene.add(doorFrame);
 
 const clock = new THREE.Clock();
