@@ -214,6 +214,7 @@ worldRoot.add(keyLight);
 
 const door = new Door();
 door.object3D.position.z = -4.45;
+door.object3D.rotation.y = -Math.PI / 90;
 worldRoot.add(door.object3D);
 
 const doorFrame = new THREE.Mesh(
