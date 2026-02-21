@@ -100,7 +100,7 @@ const startLevel = (levelIndex: number): void => {
   gameStarted = true;
   ui.revealGame();
   ui.hideLevelComplete();
-  ui.setStatus(`Level ${levelIndex + 1} started.`);
+  ui.setStatus('Find the key and unlock the door.');
 };
 
 ui.onStart(() => {
@@ -117,15 +117,12 @@ ui.onLevelSelectBack(() => {
 
 ui.onLevelSelected((levelIndex) => {
   startLevel(levelIndex);
-  if (levelIndex === 0) {
-    ui.setStatus('Move the character, find the key, unlock the door.');
-  }
 });
 
 ui.onRestart(() => {
   gameStarted = true;
   levelController.restart();
-  ui.setStatus(`Level ${levelController.currentIndex + 1} restarted.`);
+  ui.setStatus('Find the key and unlock the door.');
 });
 
 ui.onNext(() => {

@@ -196,7 +196,7 @@ export const LEVELS: LevelConfig[] = [
       }
     },
     player: {
-      spawn: { x: -4, z: 3.3 },
+      spawn: { x: -1.2, z: 3.3 },
       rotationY: 0,
       speed: 3.1,
       radius: 0.38
@@ -222,20 +222,6 @@ export const LEVELS: LevelConfig[] = [
         interaction: {
           type: 'exit',
           touchRadius: 1.05
-        }
-      },
-      {
-        id: 'key.main',
-        type: 'key',
-        transform: {
-          position: { x: 3.6, y: 0.65, z: -3.7 },
-          rotationY: 0,
-          scale: 1
-        },
-        interaction: {
-          type: 'pickup',
-          pickupRadius: 0.75,
-          itemId: 'key.main'
         }
       }
     ]
