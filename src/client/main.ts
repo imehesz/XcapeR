@@ -40,6 +40,8 @@ const ui = new UISystem();
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
+const worldRoot = new THREE.Group();
+scene.add(worldRoot);
 
 const FIT_MARGIN = 1.12;
 const cameraAspect = window.innerWidth / window.innerHeight;
@@ -77,6 +79,10 @@ let gameState: GameState = createInitialState();
 let gameStarted = false;
 let levelFinished = false;
 let gameStartTs = performance.now();
+const virtualPlayerPosition = {
+  x: LEVELS[0].playerStart.x,
+  z: LEVELS[0].playerStart.z
+};
 
 const keyState = {
   forward: false,
@@ -159,7 +165,7 @@ const floor = new THREE.Mesh(
 );
 floor.rotation.x = -Math.PI / 2;
 floor.position.y = 0;
-scene.add(floor);
+worldRoot.add(floor);
 
 const wallMaterial = new THREE.MeshStandardMaterial({
   color: 0x4a617f,
@@ -175,24 +181,24 @@ const leftWall = new THREE.Mesh(
   wallMaterial
 );
 leftWall.position.set(-ROOM_HALF, WALL_HEIGHT * 0.5, 0);
-scene.add(leftWall);
+worldRoot.add(leftWall);
 
 const backWall = new THREE.Mesh(
   new THREE.BoxGeometry(ROOM_HALF * 2, WALL_HEIGHT, wallThickness),
   wallMaterial
 );
 backWall.position.set(0, WALL_HEIGHT * 0.5, -ROOM_HALF);
-scene.add(backWall);
+worldRoot.add(backWall);
 
 const grid = new THREE.GridHelper(ROOM_HALF * 2, 10, 0x3b4b63, 0x253246);
 grid.position.y = 0.01;
-scene.add(grid);
+worldRoot.add(grid);
 
 const player = new THREE.Mesh(
   new THREE.CapsuleGeometry(0.33, 0.65, 4, 8),
   new THREE.MeshStandardMaterial({ color: 0x7ee787, roughness: 0.65 })
 );
-player.position.set(LEVELS[0].playerStart.x, PLAYER_Y, LEVELS[0].playerStart.z);
+player.position.set(0, PLAYER_Y, 0);
 scene.add(player);
 
 const keyMesh = new THREE.Mesh(
@@ -200,15 +206,15 @@ const keyMesh = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ color: 0xe9c46a, metalness: 0.35, roughness: 0.2 })
 );
 keyMesh.position.set(LEVELS[0].keyPosition.x, 0.65, LEVELS[0].keyPosition.z);
-scene.add(keyMesh);
+worldRoot.add(keyMesh);
 
 const keyLight = new THREE.PointLight(0xffd76a, 14, 8);
 keyLight.position.set(LEVELS[0].keyPosition.x, 2.1, LEVELS[0].keyPosition.z);
-scene.add(keyLight);
+worldRoot.add(keyLight);
 
 const door = new Door();
 door.object3D.position.z = -4.45;
-scene.add(door.object3D);
+worldRoot.add(door.object3D);
 
 const doorFrame = new THREE.Mesh(
   new THREE.BoxGeometry(2.1, 3.05, 0.36),
@@ -216,11 +222,11 @@ const doorFrame = new THREE.Mesh(
 );
 doorFrame.position.set(0, 1.5, 4.47);
 doorFrame.position.z = -4.47;
-scene.add(doorFrame);
+worldRoot.add(doorFrame);
 
 const catAnchor = new THREE.Group();
 catAnchor.visible = false;
-scene.add(catAnchor);
+worldRoot.add(catAnchor);
 
 let catIsActive = false;
 let catIsLoaded = false;
@@ -330,13 +336,16 @@ const applyLevel = (level: LevelConfig, levelIndex: number): void => {
   wasTouchingCat = false;
   ui.resetStatusTimer();
 
-  player.position.set(level.playerStart.x, PLAYER_Y, level.playerStart.z);
+  virtualPlayerPosition.x = level.playerStart.x;
+  virtualPlayerPosition.z = level.playerStart.z;
+  worldRoot.position.set(-virtualPlayerPosition.x, 0, -virtualPlayerPosition.z);
+  player.position.set(0, PLAYER_Y, 0);
   player.rotation.y = 0;
 
   keyMesh.position.set(level.keyPosition.x, 0.65, level.keyPosition.z);
   keyLight.position.set(level.keyPosition.x, 2.1, level.keyPosition.z);
-  if (!scene.children.includes(keyMesh)) {
-    scene.add(keyMesh);
+  if (!worldRoot.children.includes(keyMesh)) {
+    worldRoot.add(keyMesh);
   }
 
   door.reset();
@@ -377,15 +386,16 @@ const updateMovement = (dt: number): void => {
   const nx = inputX / length;
   const nz = inputZ / length;
 
-  const previous = { x: player.position.x, z: player.position.z };
+  const previous = { x: virtualPlayerPosition.x, z: virtualPlayerPosition.z };
   const next = {
-    x: player.position.x + nx * MOVE_SPEED * dt,
-    z: player.position.z + nz * MOVE_SPEED * dt
+    x: virtualPlayerPosition.x + nx * MOVE_SPEED * dt,
+    z: virtualPlayerPosition.z + nz * MOVE_SPEED * dt
   };
 
   const resolved = resolvePlayerMovement(next, previous, gameState.isDoorOpen, roomCollision);
-  player.position.x = resolved.x;
-  player.position.z = resolved.z;
+  virtualPlayerPosition.x = resolved.x;
+  virtualPlayerPosition.z = resolved.z;
+  worldRoot.position.set(-virtualPlayerPosition.x, 0, -virtualPlayerPosition.z);
   player.rotation.y = Math.atan2(nx, nz);
 };
 
@@ -394,15 +404,15 @@ const checkKeyPickup = (): void => {
     return;
   }
 
-  const dx = player.position.x - keyMesh.position.x;
-  const dz = player.position.z - keyMesh.position.z;
+  const dx = virtualPlayerPosition.x - keyMesh.position.x;
+  const dz = virtualPlayerPosition.z - keyMesh.position.z;
   const distance = Math.hypot(dx, dz);
   if (distance > KEY_PICKUP_RADIUS) {
     return;
   }
 
   gameState = collectKey(gameState);
-  scene.remove(keyMesh);
+  worldRoot.remove(keyMesh);
   setStatus('Key collected.', 'good');
   beep(740, 120);
   syncHud();
@@ -419,8 +429,8 @@ const checkDoorTouch = (): void => {
   }
 
   const doorPoint = door.object3D.position;
-  const dx = player.position.x - doorPoint.x;
-  const dz = player.position.z - doorPoint.z;
+  const dx = virtualPlayerPosition.x - doorPoint.x;
+  const dz = virtualPlayerPosition.z - doorPoint.z;
   const distance = Math.hypot(dx, dz);
   const isTouchingDoor = distance <= DOOR_TOUCH_RADIUS;
 
@@ -455,8 +465,8 @@ const checkCatTouch = (): void => {
     return;
   }
 
-  const dx = player.position.x - catAnchor.position.x;
-  const dz = player.position.z - catAnchor.position.z;
+  const dx = virtualPlayerPosition.x - catAnchor.position.x;
+  const dz = virtualPlayerPosition.z - catAnchor.position.z;
   const distance = Math.hypot(dx, dz);
   const isTouchingCat = distance <= CAT_TOUCH_RADIUS;
 
