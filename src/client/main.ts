@@ -450,12 +450,13 @@ const checkDoorTouch = (): void => {
   }
 
   gameState = openDoor(gameState);
-  void door.open();
+  void door.open().then(() => {
+    ui.showLevelComplete(levelController.currentIndex + 1);
+  });
   levelFinished = true;
   setStatus('Door opened. You escaped.', 'good');
   beep(880, 180);
   syncHud();
-  ui.showLevelComplete(levelController.currentIndex + 1);
   wasTouchingDoor = true;
 };
 
