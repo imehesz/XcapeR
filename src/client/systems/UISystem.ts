@@ -11,6 +11,10 @@ const asHTMLElement = (id: string): HTMLElement => {
 };
 
 export class UISystem {
+  private readonly preloadScreen = asHTMLElement('preloadScreen');
+  private readonly preloadProgressFill = asHTMLElement('preloadProgressFill');
+  private readonly preloadPercentEl = asHTMLElement('preloadPercent');
+  private readonly preloadHint = asHTMLElement('preloadHint');
   private readonly splash = asHTMLElement('splash');
   private readonly hud = asHTMLElement('hud');
   private readonly aboutModal = asHTMLElement('aboutModal');
@@ -64,6 +68,21 @@ export class UISystem {
   revealGame(): void {
     this.splash.classList.add('hidden');
     this.hud.classList.remove('hidden');
+  }
+
+  setPreloadProgress(ratio: number): void {
+    const clamped = Math.min(1, Math.max(0, ratio));
+    const percent = Math.round(clamped * 100);
+    this.preloadProgressFill.style.width = `${percent}%`;
+    this.preloadPercentEl.textContent = `${percent}%`;
+  }
+
+  setPreloadReady(): void {
+    this.preloadHint.textContent = 'All assets loaded.';
+  }
+
+  hidePreloader(): void {
+    this.preloadScreen.classList.add('hidden');
   }
 
   setTimer(ms: number): void {

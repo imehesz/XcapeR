@@ -23,6 +23,12 @@ const DOOR_TOUCH_RADIUS = 1.05;
 const CAT_TOUCH_RADIUS = 0.85;
 const CAT_MEOW_CHANCE = 0.5;
 const CAT_LEVEL1_POSITION = { x: -2.2, z: 1.6 };
+const PRELOAD_URLS = [
+  new URL('../../assets/models/door_medieval/door.obj', import.meta.url).href,
+  new URL('../../assets/models/door_medieval/door.png', import.meta.url).href,
+  new URL('../../assets/models/lowpolycat/cat.obj', import.meta.url).href,
+  new URL('../../assets/audio/cat-meow.wav', import.meta.url).href
+];
 
 const app = document.getElementById('app');
 const joystickEl = document.getElementById('joystick');
@@ -37,6 +43,28 @@ if (
 }
 
 const ui = new UISystem();
+
+const preloadAssets = async (onProgress: (ratio: number) => void): Promise<void> => {
+  let loaded = 0;
+  onProgress(0);
+
+  await Promise.all(
+    PRELOAD_URLS.map(async (url) => {
+      try {
+        const response = await fetch(url, { cache: 'force-cache' });
+        if (!response.ok) {
+          throw new Error(`Failed to preload: ${url}`);
+        }
+        await response.arrayBuffer();
+      } catch (error) {
+        console.warn('Preload warning:', error);
+      } finally {
+        loaded += 1;
+        onProgress(loaded / PRELOAD_URLS.length);
+      }
+    })
+  );
+};
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
@@ -634,3 +662,10 @@ ui.onNext(() => {
 levelController.load(0);
 fitCameraToRoom();
 requestAnimationFrame(animate);
+
+void preloadAssets((ratio) => {
+  ui.setPreloadProgress(ratio);
+}).then(() => {
+  ui.setPreloadReady();
+  ui.hidePreloader();
+});

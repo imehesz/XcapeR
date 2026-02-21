@@ -81,6 +81,29 @@
         gap: 0.65rem;
       }
 
+      .preload-progress {
+        width: 100%;
+        height: 0.7rem;
+        border-radius: 999px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        background: rgba(255, 255, 255, 0.08);
+        margin: 1rem 0 0.65rem;
+      }
+
+      .preload-progress-fill {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, #9bc4ff, #e9c46a);
+        transition: width 120ms linear;
+      }
+
+      .preload-percent {
+        margin: 0;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+
       .btn {
         width: 100%;
         border: 1px solid rgba(255, 255, 255, 0.35);
@@ -100,6 +123,10 @@
       .btn-primary {
         border-color: var(--accent);
         background: rgba(233, 196, 106, 0.18);
+      }
+
+      .btn[disabled] {
+        opacity: 0.5;
       }
 
       .hidden {
@@ -217,6 +244,17 @@
   </head>
   <body>
     <div id="app"></div>
+
+    <div id="preloadScreen" class="screen" style="z-index: 30">
+      <div class="panel">
+        <h1 class="title">Loading</h1>
+        <p id="preloadHint" class="subtitle">Preloading assets...</p>
+        <div class="preload-progress">
+          <div id="preloadProgressFill" class="preload-progress-fill"></div>
+        </div>
+        <p id="preloadPercent" class="preload-percent">0%</p>
+      </div>
+    </div>
 
     <div id="hud" class="hud hidden">
       <div id="timer" class="timer">00:00:00</div>
