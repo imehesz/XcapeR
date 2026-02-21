@@ -7,6 +7,8 @@ import { SceneManager } from './systems/SceneManager';
 import { UISystem } from './systems/UISystem';
 
 const PLAYER_Y = 0.45;
+const TOTAL_LEVEL_SLOTS = 9;
+const STORAGE_KEY_UNLOCKED = 'xcaper.maxUnlockedPlayableLevel';
 
 const app = document.getElementById('app');
 const joystickEl = document.getElementById('joystick');
@@ -35,6 +37,13 @@ const levelController = new LevelController(LEVELS, {
   state,
   playerMesh: player,
   onCompleted: (index) => {
+    completedLevelIndexes.add(index);
+    const nextUnlocked = Math.min(LEVELS.length, Math.max(maxUnlockedPlayableLevels, index + 2));
+    if (nextUnlocked !== maxUnlockedPlayableLevels) {
+      maxUnlockedPlayableLevels = nextUnlocked;
+      localStorage.setItem(STORAGE_KEY_UNLOCKED, String(maxUnlockedPlayableLevels));
+    }
+    gameStarted = false;
     ui.showLevelComplete(index + 1);
   }
 });
@@ -65,24 +74,68 @@ const preloadAssets = async (
 };
 
 let gameStarted = false;
+const completedLevelIndexes = new Set<number>();
+const storedUnlockedRaw = Number(localStorage.getItem(STORAGE_KEY_UNLOCKED));
+let maxUnlockedPlayableLevels = Number.isFinite(storedUnlockedRaw)
+  ? Math.min(LEVELS.length, Math.max(1, Math.floor(storedUnlockedRaw)))
+  : 1;
+
+const showLevelSelect = (): void => {
+  gameStarted = false;
+  ui.hideLevelComplete();
+  ui.renderLevelSelect({
+    totalSlots: TOTAL_LEVEL_SLOTS,
+    availableLevels: LEVELS.length,
+    unlockedPlayableLevels: maxUnlockedPlayableLevels,
+    completedLevelIndexes
+  });
+  ui.showLevelSelect();
+};
+
+const startLevel = (levelIndex: number): void => {
+  if (levelIndex < 0 || levelIndex >= maxUnlockedPlayableLevels || levelIndex >= LEVELS.length) {
+    return;
+  }
+  levelController.load(levelIndex);
+  gameStarted = true;
+  ui.revealGame();
+  ui.hideLevelComplete();
+  ui.setStatus(`Level ${levelIndex + 1} started.`);
+};
 
 ui.onStart(() => {
-  ui.revealGame();
-  if (!gameStarted) {
-    gameStarted = true;
-    levelController.restart();
+  showLevelSelect();
+});
+
+ui.onOpenLevelSelect(() => {
+  showLevelSelect();
+});
+
+ui.onLevelSelectBack(() => {
+  ui.showSplash();
+});
+
+ui.onLevelSelected((levelIndex) => {
+  startLevel(levelIndex);
+  if (levelIndex === 0) {
     ui.setStatus('Move the character, find the key, unlock the door.');
   }
 });
 
 ui.onRestart(() => {
+  gameStarted = true;
   levelController.restart();
   ui.setStatus(`Level ${levelController.currentIndex + 1} restarted.`);
 });
 
 ui.onNext(() => {
-  levelController.next();
-  ui.setStatus(`Level ${levelController.currentIndex + 1} started.`);
+  const nextIndex = levelController.currentIndex + 1;
+  if (nextIndex < maxUnlockedPlayableLevels && nextIndex < LEVELS.length) {
+    startLevel(nextIndex);
+    return;
+  }
+  showLevelSelect();
+  ui.setStatus('Pick an unlocked level.');
 });
 
 levelController.load(0);
