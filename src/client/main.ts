@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { Door } from './entities/Door';
 import { LEVELS, type LevelConfig } from './game/levels';
 import { LevelController } from './game/LevelController';
@@ -19,6 +20,9 @@ const PLAYER_Y = 0.45;
 const MOVE_SPEED = 3.1;
 const KEY_PICKUP_RADIUS = 0.75;
 const DOOR_TOUCH_RADIUS = 1.05;
+const CAT_TOUCH_RADIUS = 0.85;
+const CAT_MEOW_CHANCE = 0.5;
+const CAT_LEVEL1_POSITION = { x: -2.2, z: 1.6 };
 
 const app = document.getElementById('app');
 const joystickEl = document.getElementById('joystick');
@@ -88,6 +92,7 @@ const joystickState = {
 };
 
 let wasTouchingDoor = false;
+let wasTouchingCat = false;
 
 const fitCameraToRoom = (): void => {
   const aspect = window.innerWidth / window.innerHeight;
@@ -213,6 +218,17 @@ doorFrame.position.set(0, 1.5, 4.47);
 doorFrame.position.z = -4.47;
 scene.add(doorFrame);
 
+const catAnchor = new THREE.Group();
+catAnchor.visible = false;
+scene.add(catAnchor);
+
+let catIsActive = false;
+let catIsLoaded = false;
+const catMeowUrl = new URL('../../assets/audio/cat-meow.wav', import.meta.url).href;
+const catMeowAudio = new Audio(catMeowUrl);
+catMeowAudio.preload = 'auto';
+catMeowAudio.volume = 0.45;
+
 const clock = new THREE.Clock();
 
 const setStatus = (message: string, tone: 'normal' | 'good' = 'normal'): void => {
@@ -254,11 +270,64 @@ const resetInput = (): void => {
   joystickKnobEl.style.transform = 'translate(-50%, -50%)';
 };
 
+const maybePlayCatMeow = (): void => {
+  if (Math.random() > CAT_MEOW_CHANCE) {
+    return;
+  }
+
+  const meow = catMeowAudio.cloneNode(true) as HTMLAudioElement;
+  meow.volume = catMeowAudio.volume;
+  void meow.play().catch(() => {
+    // Ignore playback errors when browser blocks audio.
+  });
+};
+
+const loadCat = (): void => {
+  const loader = new OBJLoader();
+  const catUrl = new URL('../../assets/models/lowpolycat/cat.obj', import.meta.url).href;
+
+  loader.load(
+    catUrl,
+    (object: any) => {
+      const bbox = new THREE.Box3().setFromObject(object);
+      const size = bbox.getSize(new THREE.Vector3());
+
+      if (size.y > 0.0001) {
+        const desiredHeight = 0.72;
+        const uniformScale = desiredHeight / size.y;
+        object.scale.setScalar(uniformScale);
+      }
+
+      const centeredBox = new THREE.Box3().setFromObject(object);
+      const center = centeredBox.getCenter(new THREE.Vector3());
+      const yOffset = -centeredBox.min.y + 0.02;
+      object.position.set(-center.x, yOffset, -center.z);
+
+      object.traverse((child: any) => {
+        if (child instanceof THREE.Mesh) {
+          child.castShadow = false;
+          child.receiveShadow = false;
+        }
+      });
+
+      catAnchor.add(object);
+      catIsLoaded = true;
+      catAnchor.position.set(CAT_LEVEL1_POSITION.x, 0, CAT_LEVEL1_POSITION.z);
+      catAnchor.rotation.y = Math.PI * 0.35;
+    },
+    undefined,
+    (error: unknown) => {
+      console.error('Failed to load cat asset', error);
+    }
+  );
+};
+
 const applyLevel = (level: LevelConfig, levelIndex: number): void => {
   gameState = createInitialState();
   levelFinished = false;
   gameStartTs = performance.now();
   wasTouchingDoor = false;
+  wasTouchingCat = false;
   ui.resetStatusTimer();
 
   player.position.set(level.playerStart.x, PLAYER_Y, level.playerStart.z);
@@ -274,6 +343,18 @@ const applyLevel = (level: LevelConfig, levelIndex: number): void => {
   resetInput();
   ui.setLevelLabel(levelIndex + 1);
   ui.hideLevelComplete();
+
+  catIsActive = levelIndex === 0;
+  catAnchor.visible = catIsActive;
+  if (catIsActive) {
+    if (!catIsLoaded) {
+      loadCat();
+    } else {
+      catAnchor.position.set(CAT_LEVEL1_POSITION.x, 0, CAT_LEVEL1_POSITION.z);
+      catAnchor.rotation.y = Math.PI * 0.35;
+    }
+  }
+
   syncHud();
 };
 
@@ -368,6 +449,29 @@ const checkDoorTouch = (): void => {
   wasTouchingDoor = true;
 };
 
+const checkCatTouch = (): void => {
+  if (!catIsActive || !catIsLoaded) {
+    wasTouchingCat = false;
+    return;
+  }
+
+  const dx = player.position.x - catAnchor.position.x;
+  const dz = player.position.z - catAnchor.position.z;
+  const distance = Math.hypot(dx, dz);
+  const isTouchingCat = distance <= CAT_TOUCH_RADIUS;
+
+  if (!isTouchingCat) {
+    wasTouchingCat = false;
+    return;
+  }
+
+  if (!wasTouchingCat) {
+    maybePlayCatMeow();
+  }
+
+  wasTouchingCat = true;
+};
+
 const animate = (ts: number): void => {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
@@ -382,6 +486,7 @@ const animate = (ts: number): void => {
       updateMovement(dt);
       checkKeyPickup();
       checkDoorTouch();
+      checkCatTouch();
     }
     keyMesh.rotation.y += dt * 1.8;
     ui.tick(ts);
