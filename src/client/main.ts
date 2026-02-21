@@ -14,6 +14,8 @@ const ROOM_HALF = 5;
 const WALL_HEIGHT = ROOM_HALF;
 const PLAYER_Y = 0.45;
 const MOVE_SPEED = 3.1;
+const KEY_PICKUP_RADIUS = 0.75;
+const DOOR_TOUCH_RADIUS = 1.05;
 
 const app = document.getElementById('app');
 const splash = document.getElementById('splash');
@@ -54,13 +56,13 @@ if (
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 
-const ORTHO_SIZE = 7.5;
+const FIT_MARGIN = 1.12;
 const cameraAspect = window.innerWidth / window.innerHeight;
 const camera = new THREE.OrthographicCamera(
-  -ORTHO_SIZE * cameraAspect,
-  ORTHO_SIZE * cameraAspect,
-  ORTHO_SIZE,
-  -ORTHO_SIZE,
+  -8 * cameraAspect,
+  8 * cameraAspect,
+  8,
+  -8,
   0.1,
   100
 );
@@ -104,9 +106,55 @@ const joystickState = {
   pointerId: -1
 };
 
-const raycaster = new THREE.Raycaster();
-const pointer = new THREE.Vector2();
-const interactables: any[] = [];
+let wasTouchingDoor = false;
+
+const fitCameraToRoom = (): void => {
+  const aspect = window.innerWidth / window.innerHeight;
+  const roomBounds = new THREE.Box3(
+    new THREE.Vector3(-ROOM_HALF, 0, -ROOM_HALF),
+    new THREE.Vector3(ROOM_HALF, WALL_HEIGHT, ROOM_HALF)
+  );
+
+  const corners = [
+    new THREE.Vector3(roomBounds.min.x, roomBounds.min.y, roomBounds.min.z),
+    new THREE.Vector3(roomBounds.min.x, roomBounds.min.y, roomBounds.max.z),
+    new THREE.Vector3(roomBounds.min.x, roomBounds.max.y, roomBounds.min.z),
+    new THREE.Vector3(roomBounds.min.x, roomBounds.max.y, roomBounds.max.z),
+    new THREE.Vector3(roomBounds.max.x, roomBounds.min.y, roomBounds.min.z),
+    new THREE.Vector3(roomBounds.max.x, roomBounds.min.y, roomBounds.max.z),
+    new THREE.Vector3(roomBounds.max.x, roomBounds.max.y, roomBounds.min.z),
+    new THREE.Vector3(roomBounds.max.x, roomBounds.max.y, roomBounds.max.z)
+  ];
+
+  camera.updateMatrixWorld(true);
+
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const corner of corners) {
+    const view = corner.clone().applyMatrix4(camera.matrixWorldInverse);
+    minX = Math.min(minX, view.x);
+    maxX = Math.max(maxX, view.x);
+    minY = Math.min(minY, view.y);
+    maxY = Math.max(maxY, view.y);
+  }
+
+  const centerX = (minX + maxX) * 0.5;
+  const centerY = (minY + maxY) * 0.5;
+  const halfWidth = ((maxX - minX) * 0.5) * FIT_MARGIN;
+  const halfHeight = ((maxY - minY) * 0.5) * FIT_MARGIN;
+
+  const fittedHalfHeight = Math.max(halfHeight, halfWidth / aspect);
+  const fittedHalfWidth = fittedHalfHeight * aspect;
+
+  camera.left = centerX - fittedHalfWidth;
+  camera.right = centerX + fittedHalfWidth;
+  camera.top = centerY + fittedHalfHeight;
+  camera.bottom = centerY - fittedHalfHeight;
+  camera.updateProjectionMatrix();
+};
 
 const ambient = new THREE.AmbientLight(0xffffff, 0.72);
 scene.add(ambient);
@@ -157,7 +205,6 @@ const keyMesh = new THREE.Mesh(
 );
 keyMesh.position.set(4, 0.65, -4);
 scene.add(keyMesh);
-interactables.push(keyMesh);
 
 const keyLight = new THREE.PointLight(0xffd76a, 14, 8);
 keyLight.position.set(4, 2.1, -4);
@@ -165,7 +212,6 @@ scene.add(keyLight);
 
 const door = new Door();
 scene.add(door.object3D);
-interactables.push(door.object3D);
 
 const doorFrame = new THREE.Mesh(
   new THREE.BoxGeometry(2.1, 3.05, 0.36),
@@ -222,55 +268,6 @@ const syncHud = (): void => {
   inventoryEl.classList.toggle('active', gameState.isKeyCollected);
 };
 
-const removeInteractable = (target: any): void => {
-  const idx = interactables.indexOf(target);
-  if (idx >= 0) {
-    interactables.splice(idx, 1);
-  }
-};
-
-const tryInteract = (clientX: number, clientY: number): void => {
-  if (!gameStarted) {
-    return;
-  }
-
-  pointer.x = (clientX / window.innerWidth) * 2 - 1;
-  pointer.y = -(clientY / window.innerHeight) * 2 + 1;
-  raycaster.setFromCamera(pointer, camera);
-
-  const hits = raycaster.intersectObjects(interactables, true);
-  if (!hits.length) {
-    return;
-  }
-
-  const root = hits[0].object === keyMesh ? keyMesh : door.object3D;
-
-  if (root === keyMesh && !gameState.isKeyCollected) {
-    gameState = collectKey(gameState);
-    scene.remove(keyMesh);
-    removeInteractable(keyMesh);
-    setStatus('Key collected.', 'good');
-    beep(740, 120);
-    syncHud();
-    return;
-  }
-
-  if (root === door.object3D && !gameState.isDoorOpen) {
-    if (!canOpenDoor(gameState.isKeyCollected)) {
-      setStatus('Door is locked. Find the key.');
-      door.lockedShake();
-      beep(180, 160);
-      return;
-    }
-
-    gameState = openDoor(gameState);
-    void door.open();
-    setStatus('Door opened. You escaped.', 'good');
-    beep(880, 180);
-    syncHud();
-  }
-};
-
 const updateMovement = (dt: number): void => {
   const inputX = Number(keyState.right) - Number(keyState.left) + joystickState.x;
   const inputZ = Number(keyState.forward) - Number(keyState.backward) - joystickState.y;
@@ -295,6 +292,60 @@ const updateMovement = (dt: number): void => {
   player.rotation.y = Math.atan2(nx, nz);
 };
 
+const checkKeyPickup = (): void => {
+  if (gameState.isKeyCollected) {
+    return;
+  }
+
+  const dx = player.position.x - keyMesh.position.x;
+  const dz = player.position.z - keyMesh.position.z;
+  const distance = Math.hypot(dx, dz);
+  if (distance > KEY_PICKUP_RADIUS) {
+    return;
+  }
+
+  gameState = collectKey(gameState);
+  scene.remove(keyMesh);
+  setStatus('Key collected.', 'good');
+  beep(740, 120);
+  syncHud();
+};
+
+const checkDoorTouch = (): void => {
+  if (gameState.isDoorOpen) {
+    wasTouchingDoor = true;
+    return;
+  }
+
+  const doorPoint = door.object3D.position;
+  const dx = player.position.x - doorPoint.x;
+  const dz = player.position.z - doorPoint.z;
+  const distance = Math.hypot(dx, dz);
+  const isTouchingDoor = distance <= DOOR_TOUCH_RADIUS;
+
+  if (!isTouchingDoor) {
+    wasTouchingDoor = false;
+    return;
+  }
+
+  if (!canOpenDoor(gameState.isKeyCollected)) {
+    if (!wasTouchingDoor) {
+      setStatus('Door is locked. Find the key.');
+      door.lockedShake();
+      beep(180, 160);
+    }
+    wasTouchingDoor = true;
+    return;
+  }
+
+  gameState = openDoor(gameState);
+  void door.open();
+  setStatus('Door opened. You escaped.', 'good');
+  beep(880, 180);
+  syncHud();
+  wasTouchingDoor = true;
+};
+
 const animate = (ts: number): void => {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
@@ -306,6 +357,8 @@ const animate = (ts: number): void => {
 
   if (gameStarted) {
     updateMovement(dt);
+    checkKeyPickup();
+    checkDoorTouch();
     keyMesh.rotation.y += dt * 1.8;
 
     if (statusEl.classList.contains('visible') && ts - lastStatusTs > 1800) {
@@ -369,21 +422,12 @@ const isInside = (el: HTMLElement, clientX: number, clientY: number): boolean =>
 };
 
 window.addEventListener('resize', () => {
-  const nextAspect = window.innerWidth / window.innerHeight;
-  camera.left = -ORTHO_SIZE * nextAspect;
-  camera.right = ORTHO_SIZE * nextAspect;
-  camera.top = ORTHO_SIZE;
-  camera.bottom = -ORTHO_SIZE;
-  camera.updateProjectionMatrix();
+  fitCameraToRoom();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
 window.addEventListener('keydown', (e: KeyboardEvent) => onKeyChange(e, true));
 window.addEventListener('keyup', (e: KeyboardEvent) => onKeyChange(e, false));
-
-renderer.domElement.addEventListener('click', (e: MouseEvent) => {
-  tryInteract(e.clientX, e.clientY);
-});
 
 renderer.domElement.addEventListener(
   'touchstart',
@@ -392,10 +436,7 @@ renderer.domElement.addEventListener(
       if (isInside(joystickEl, touch.clientX, touch.clientY) && joystickState.pointerId === -1) {
         joystickState.pointerId = touch.identifier;
         handleJoystickMove(touch.clientX, touch.clientY);
-        continue;
       }
-
-      tryInteract(touch.clientX, touch.clientY);
     }
   },
   { passive: false }
@@ -461,4 +502,5 @@ optionsCloseBtn.addEventListener('click', () => {
 });
 
 syncHud();
+fitCameraToRoom();
 requestAnimationFrame(animate);
