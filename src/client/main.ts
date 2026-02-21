@@ -1,55 +1,53 @@
 import * as THREE from 'three';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
-import { Door } from './entities/Door';
-import { LEVELS, type LevelConfig } from './game/levels';
+import { LEVELS, collectLevelAssetUrls } from './game/levels';
 import { LevelController } from './game/LevelController';
+import { GameStateManager } from './systems/GameStateManager';
+import { InputManager } from './systems/InputManager';
+import { SceneManager } from './systems/SceneManager';
 import { UISystem } from './systems/UISystem';
-import {
-  createInitialState,
-  collectKey,
-  openDoor,
-  updateTimer,
-  type GameState
-} from '../shared/state';
-import { canOpenDoor } from '../shared/puzzles/KeyLogic';
-import { resolvePlayerMovement, type RoomCollisionConfig } from '../shared/CollisionMath';
 
-const ROOM_HALF = 5;
-const WALL_HEIGHT = ROOM_HALF;
 const PLAYER_Y = 0.45;
-const MOVE_SPEED = 3.1;
-const KEY_PICKUP_RADIUS = 0.75;
-const DOOR_TOUCH_RADIUS = 1.05;
-const CAT_TOUCH_RADIUS = 0.85;
-const CAT_MEOW_CHANCE = 0.5;
-const CAT_LEVEL1_POSITION = { x: -2.2, z: 1.6 };
-const PRELOAD_URLS = [
-  new URL('../../assets/models/door_medieval/door.obj', import.meta.url).href,
-  new URL('../../assets/models/door_medieval/door.png', import.meta.url).href,
-  new URL('../../assets/models/lowpolycat/cat.obj', import.meta.url).href,
-  new URL('../../assets/audio/cat-meow.wav', import.meta.url).href
-];
 
 const app = document.getElementById('app');
 const joystickEl = document.getElementById('joystick');
 const joystickKnobEl = document.getElementById('joystickKnob');
 
-if (
-  !app ||
-  !joystickEl ||
-  !joystickKnobEl
-) {
+if (!app || !joystickEl || !joystickKnobEl) {
   throw new Error('Missing required DOM elements.');
 }
 
 const ui = new UISystem();
+const sceneManager = new SceneManager(app);
+const inputManager = new InputManager(joystickEl, joystickKnobEl);
+const state = new GameStateManager();
 
-const preloadAssets = async (onProgress: (ratio: number) => void): Promise<void> => {
+const player = new THREE.Mesh(
+  new THREE.CapsuleGeometry(0.33, 0.65, 4, 8),
+  new THREE.MeshStandardMaterial({ color: 0x7ee787, roughness: 0.65 })
+);
+player.position.set(0, PLAYER_Y, 0);
+sceneManager.scene.add(player);
+
+const levelController = new LevelController(LEVELS, {
+  sceneManager,
+  inputManager,
+  ui,
+  state,
+  playerMesh: player,
+  onCompleted: (index) => {
+    ui.showLevelComplete(index + 1);
+  }
+});
+
+const preloadAssets = async (
+  urls: string[],
+  onProgress: (ratio: number) => void
+): Promise<void> => {
   let loaded = 0;
   onProgress(0);
 
   await Promise.all(
-    PRELOAD_URLS.map(async (url) => {
+    urls.map(async (url) => {
       try {
         const response = await fetch(url, { cache: 'force-cache' });
         if (!response.ok) {
@@ -60,612 +58,58 @@ const preloadAssets = async (onProgress: (ratio: number) => void): Promise<void>
         console.warn('Preload warning:', error);
       } finally {
         loaded += 1;
-        onProgress(loaded / PRELOAD_URLS.length);
+        onProgress(loaded / urls.length);
       }
     })
   );
 };
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x000000);
-const worldRoot = new THREE.Group();
-scene.add(worldRoot);
-
-const FIT_MARGIN = 1.12;
-const cameraAspect = window.innerWidth / window.innerHeight;
-const camera = new THREE.OrthographicCamera(
-  -8 * cameraAspect,
-  8 * cameraAspect,
-  8,
-  -8,
-  0.1,
-  100
-);
-camera.position.set(10, 9, 10);
-camera.lookAt(0, 1.2, 0);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
-app.appendChild(renderer.domElement);
-
-const roomCollision: RoomCollisionConfig = {
-  minX: -ROOM_HALF + 0.1,
-  maxX: ROOM_HALF - 0.1,
-  minZ: -ROOM_HALF + 0.1,
-  maxZ: ROOM_HALF - 0.1,
-  playerRadius: 0.38,
-  closedDoorBounds: {
-    minX: -0.95,
-    maxX: 0.95,
-    minZ: -4.9,
-    maxZ: -4.05
-  }
-};
-
-let gameState: GameState = createInitialState();
 let gameStarted = false;
-let levelFinished = false;
-let gameStartTs = performance.now();
-const virtualPlayerPosition = {
-  x: LEVELS[0].playerStart.x,
-  z: LEVELS[0].playerStart.z
-};
-
-const keyState = {
-  forward: false,
-  backward: false,
-  left: false,
-  right: false
-};
-
-const joystickState = {
-  x: 0,
-  y: 0,
-  pointerId: -1
-};
-
-let wasTouchingDoor = false;
-let wasTouchingCat = false;
-
-const fitCameraToRoom = (): void => {
-  const aspect = window.innerWidth / window.innerHeight;
-  const roomBounds = new THREE.Box3(
-    new THREE.Vector3(-ROOM_HALF, 0, -ROOM_HALF),
-    new THREE.Vector3(ROOM_HALF, WALL_HEIGHT, ROOM_HALF)
-  );
-
-  const corners = [
-    new THREE.Vector3(roomBounds.min.x, roomBounds.min.y, roomBounds.min.z),
-    new THREE.Vector3(roomBounds.min.x, roomBounds.min.y, roomBounds.max.z),
-    new THREE.Vector3(roomBounds.min.x, roomBounds.max.y, roomBounds.min.z),
-    new THREE.Vector3(roomBounds.min.x, roomBounds.max.y, roomBounds.max.z),
-    new THREE.Vector3(roomBounds.max.x, roomBounds.min.y, roomBounds.min.z),
-    new THREE.Vector3(roomBounds.max.x, roomBounds.min.y, roomBounds.max.z),
-    new THREE.Vector3(roomBounds.max.x, roomBounds.max.y, roomBounds.min.z),
-    new THREE.Vector3(roomBounds.max.x, roomBounds.max.y, roomBounds.max.z)
-  ];
-
-  camera.updateMatrixWorld(true);
-
-  let minX = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-
-  for (const corner of corners) {
-    const view = corner.clone().applyMatrix4(camera.matrixWorldInverse);
-    minX = Math.min(minX, view.x);
-    maxX = Math.max(maxX, view.x);
-    minY = Math.min(minY, view.y);
-    maxY = Math.max(maxY, view.y);
-  }
-
-  const centerX = (minX + maxX) * 0.5;
-  const centerY = (minY + maxY) * 0.5;
-  const halfWidth = ((maxX - minX) * 0.5) * FIT_MARGIN;
-  const halfHeight = ((maxY - minY) * 0.5) * FIT_MARGIN;
-
-  const fittedHalfHeight = Math.max(halfHeight, halfWidth / aspect);
-  const fittedHalfWidth = fittedHalfHeight * aspect;
-
-  camera.left = centerX - fittedHalfWidth;
-  camera.right = centerX + fittedHalfWidth;
-  camera.top = centerY + fittedHalfHeight;
-  camera.bottom = centerY - fittedHalfHeight;
-  camera.updateProjectionMatrix();
-};
-
-const ambient = new THREE.AmbientLight(0xffffff, 0.72);
-scene.add(ambient);
-
-const mainLight = new THREE.DirectionalLight(0xffffff, 0.75);
-mainLight.position.set(7, 10, 4);
-scene.add(mainLight);
-
-const fillLight = new THREE.DirectionalLight(0x7aa7ff, 0.35);
-fillLight.position.set(-8, 6, -6);
-scene.add(fillLight);
-
-const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(ROOM_HALF * 2, ROOM_HALF * 2),
-  new THREE.MeshStandardMaterial({ color: 0x263142, roughness: 0.92, metalness: 0.05 })
-);
-floor.rotation.x = -Math.PI / 2;
-floor.position.y = 0;
-worldRoot.add(floor);
-
-const wallMaterial = new THREE.MeshStandardMaterial({
-  color: 0x4a617f,
-  transparent: true,
-  opacity: 0.24,
-  side: THREE.DoubleSide,
-  roughness: 1
-});
-
-const wallThickness = 0.12;
-const leftWall = new THREE.Mesh(
-  new THREE.BoxGeometry(wallThickness, WALL_HEIGHT, ROOM_HALF * 2),
-  wallMaterial
-);
-leftWall.position.set(-ROOM_HALF, WALL_HEIGHT * 0.5, 0);
-worldRoot.add(leftWall);
-
-const backWall = new THREE.Mesh(
-  new THREE.BoxGeometry(ROOM_HALF * 2, WALL_HEIGHT, wallThickness),
-  wallMaterial
-);
-backWall.position.set(0, WALL_HEIGHT * 0.5, -ROOM_HALF);
-worldRoot.add(backWall);
-
-const grid = new THREE.GridHelper(ROOM_HALF * 2, 10, 0x3b4b63, 0x253246);
-grid.position.y = 0.01;
-worldRoot.add(grid);
-
-const player = new THREE.Mesh(
-  new THREE.CapsuleGeometry(0.33, 0.65, 4, 8),
-  new THREE.MeshStandardMaterial({ color: 0x7ee787, roughness: 0.65 })
-);
-player.position.set(0, PLAYER_Y, 0);
-scene.add(player);
-
-const keyMesh = new THREE.Mesh(
-  new THREE.BoxGeometry(0.45, 0.22, 0.22),
-  new THREE.MeshStandardMaterial({ color: 0xe9c46a, metalness: 0.35, roughness: 0.2 })
-);
-keyMesh.position.set(LEVELS[0].keyPosition.x, 0.65, LEVELS[0].keyPosition.z);
-worldRoot.add(keyMesh);
-
-const keyLight = new THREE.PointLight(0xffd76a, 14, 8);
-keyLight.position.set(LEVELS[0].keyPosition.x, 2.1, LEVELS[0].keyPosition.z);
-worldRoot.add(keyLight);
-
-const door = new Door();
-door.object3D.position.z = -4.45;
-door.object3D.rotation.y = -Math.PI / 90;
-worldRoot.add(door.object3D);
-
-const doorFrame = new THREE.Mesh(
-  new THREE.BoxGeometry(2.1, 3.05, 0.36),
-  new THREE.MeshStandardMaterial({ color: 0x3a2a22 })
-);
-doorFrame.position.set(0, 1.5, 4.47);
-doorFrame.position.z = -4.47;
-worldRoot.add(doorFrame);
-
-const catAnchor = new THREE.Group();
-catAnchor.visible = false;
-worldRoot.add(catAnchor);
-
-let catIsActive = false;
-let catIsLoaded = false;
-const catMeowUrl = new URL('../../assets/audio/cat-meow.wav', import.meta.url).href;
-const catMeowAudio = new Audio(catMeowUrl);
-catMeowAudio.preload = 'auto';
-catMeowAudio.volume = 0.45;
-
-const clock = new THREE.Clock();
-
-const setStatus = (message: string, tone: 'normal' | 'good' = 'normal'): void => {
-  ui.setStatus(message, tone);
-};
-
-const beep = (frequency: number, durationMs: number): void => {
-  const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioCtx) {
-    return;
-  }
-
-  const audioCtx = new AudioCtx();
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-
-  osc.frequency.value = frequency;
-  osc.type = 'triangle';
-  gain.gain.value = 0.04;
-
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-
-  osc.start();
-  setTimeout(() => {
-    osc.stop();
-    void audioCtx.close();
-  }, durationMs);
-};
-
-const resetInput = (): void => {
-  keyState.forward = false;
-  keyState.backward = false;
-  keyState.left = false;
-  keyState.right = false;
-  joystickState.pointerId = -1;
-  joystickState.x = 0;
-  joystickState.y = 0;
-  joystickKnobEl.style.transform = 'translate(-50%, -50%)';
-};
-
-const maybePlayCatMeow = (): void => {
-  if (Math.random() > CAT_MEOW_CHANCE) {
-    return;
-  }
-
-  const meow = catMeowAudio.cloneNode(true) as HTMLAudioElement;
-  meow.volume = catMeowAudio.volume;
-  void meow.play().catch(() => {
-    // Ignore playback errors when browser blocks audio.
-  });
-};
-
-const loadCat = (): void => {
-  const loader = new OBJLoader();
-  const catUrl = new URL('../../assets/models/lowpolycat/cat.obj', import.meta.url).href;
-
-  loader.load(
-    catUrl,
-    (object: any) => {
-      const bbox = new THREE.Box3().setFromObject(object);
-      const size = bbox.getSize(new THREE.Vector3());
-
-      if (size.y > 0.0001) {
-        const desiredHeight = 0.72;
-        const uniformScale = desiredHeight / size.y;
-        object.scale.setScalar(uniformScale);
-      }
-
-      const centeredBox = new THREE.Box3().setFromObject(object);
-      const center = centeredBox.getCenter(new THREE.Vector3());
-      const yOffset = -centeredBox.min.y + 0.02;
-      object.position.set(-center.x, yOffset, -center.z);
-
-      object.traverse((child: any) => {
-        if (child instanceof THREE.Mesh) {
-          child.castShadow = false;
-          child.receiveShadow = false;
-        }
-      });
-
-      catAnchor.add(object);
-      catIsLoaded = true;
-      catAnchor.position.set(CAT_LEVEL1_POSITION.x, 0, CAT_LEVEL1_POSITION.z);
-      catAnchor.rotation.y = Math.PI * 0.35;
-    },
-    undefined,
-    (error: unknown) => {
-      console.error('Failed to load cat asset', error);
-    }
-  );
-};
-
-const applyLevel = (level: LevelConfig, levelIndex: number): void => {
-  gameState = createInitialState();
-  levelFinished = false;
-  gameStartTs = performance.now();
-  wasTouchingDoor = false;
-  wasTouchingCat = false;
-  ui.resetStatusTimer();
-
-  virtualPlayerPosition.x = level.playerStart.x;
-  virtualPlayerPosition.z = level.playerStart.z;
-  worldRoot.position.set(-virtualPlayerPosition.x, 0, -virtualPlayerPosition.z);
-  player.position.set(0, PLAYER_Y, 0);
-  player.rotation.y = 0;
-
-  keyMesh.position.set(level.keyPosition.x, 0.65, level.keyPosition.z);
-  keyLight.position.set(level.keyPosition.x, 2.1, level.keyPosition.z);
-  if (!worldRoot.children.includes(keyMesh)) {
-    worldRoot.add(keyMesh);
-  }
-
-  door.reset();
-  resetInput();
-  ui.setLevelLabel(levelIndex + 1);
-  ui.hideLevelComplete();
-
-  catIsActive = levelIndex === 0;
-  catAnchor.visible = catIsActive;
-  if (catIsActive) {
-    if (!catIsLoaded) {
-      loadCat();
-    } else {
-      catAnchor.position.set(CAT_LEVEL1_POSITION.x, 0, CAT_LEVEL1_POSITION.z);
-      catAnchor.rotation.y = Math.PI * 0.35;
-    }
-  }
-
-  syncHud();
-};
-
-const levelController = new LevelController(LEVELS, applyLevel);
-
-const syncHud = (): void => {
-  ui.setTimer(gameState.timerValue);
-  ui.setInventoryActive(gameState.isKeyCollected);
-};
-
-const updateMovement = (dt: number): void => {
-  const inputX = Number(keyState.right) - Number(keyState.left) + joystickState.x;
-  const inputZ = Number(keyState.forward) - Number(keyState.backward) + joystickState.y;
-  const length = Math.hypot(inputX, inputZ);
-
-  if (length < 0.001) {
-    return;
-  }
-
-  const nx = inputX / length;
-  const nz = inputZ / length;
-
-  const previous = { x: virtualPlayerPosition.x, z: virtualPlayerPosition.z };
-  const next = {
-    x: virtualPlayerPosition.x + nx * MOVE_SPEED * dt,
-    z: virtualPlayerPosition.z + nz * MOVE_SPEED * dt
-  };
-
-  const resolved = resolvePlayerMovement(next, previous, gameState.isDoorOpen, roomCollision);
-  virtualPlayerPosition.x = resolved.x;
-  virtualPlayerPosition.z = resolved.z;
-  worldRoot.position.set(-virtualPlayerPosition.x, 0, -virtualPlayerPosition.z);
-  player.rotation.y = Math.atan2(nx, nz);
-};
-
-const checkKeyPickup = (): void => {
-  if (gameState.isKeyCollected) {
-    return;
-  }
-
-  const dx = virtualPlayerPosition.x - keyMesh.position.x;
-  const dz = virtualPlayerPosition.z - keyMesh.position.z;
-  const distance = Math.hypot(dx, dz);
-  if (distance > KEY_PICKUP_RADIUS) {
-    return;
-  }
-
-  gameState = collectKey(gameState);
-  worldRoot.remove(keyMesh);
-  setStatus('Key collected.', 'good');
-  beep(740, 120);
-  syncHud();
-};
-
-const checkDoorTouch = (): void => {
-  if (levelFinished) {
-    return;
-  }
-
-  if (gameState.isDoorOpen) {
-    wasTouchingDoor = true;
-    return;
-  }
-
-  const doorPoint = door.object3D.position;
-  const dx = virtualPlayerPosition.x - doorPoint.x;
-  const dz = virtualPlayerPosition.z - doorPoint.z;
-  const distance = Math.hypot(dx, dz);
-  const isTouchingDoor = distance <= DOOR_TOUCH_RADIUS;
-
-  if (!isTouchingDoor) {
-    wasTouchingDoor = false;
-    return;
-  }
-
-  if (!canOpenDoor(gameState.isKeyCollected)) {
-    if (!wasTouchingDoor) {
-      setStatus('Door is locked. Find the key.');
-      door.lockedShake();
-      beep(180, 160);
-    }
-    wasTouchingDoor = true;
-    return;
-  }
-
-  gameState = openDoor(gameState);
-  void door.open().then(() => {
-    ui.showLevelComplete(levelController.currentIndex + 1);
-  });
-  levelFinished = true;
-  setStatus('Door opened. You escaped.', 'good');
-  beep(880, 180);
-  syncHud();
-  wasTouchingDoor = true;
-};
-
-const checkCatTouch = (): void => {
-  if (!catIsActive || !catIsLoaded) {
-    wasTouchingCat = false;
-    return;
-  }
-
-  const dx = virtualPlayerPosition.x - catAnchor.position.x;
-  const dz = virtualPlayerPosition.z - catAnchor.position.z;
-  const distance = Math.hypot(dx, dz);
-  const isTouchingCat = distance <= CAT_TOUCH_RADIUS;
-
-  if (!isTouchingCat) {
-    wasTouchingCat = false;
-    return;
-  }
-
-  if (!wasTouchingCat) {
-    maybePlayCatMeow();
-  }
-
-  wasTouchingCat = true;
-};
-
-const animate = (ts: number): void => {
-  requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.05);
-
-  if (gameStarted && !levelFinished && !gameState.isDoorOpen) {
-    gameState = updateTimer(gameState, ts - gameStartTs);
-    syncHud();
-  }
-
-  if (gameStarted) {
-    if (!levelFinished) {
-      updateMovement(dt);
-      checkKeyPickup();
-      checkDoorTouch();
-      checkCatTouch();
-    }
-    keyMesh.rotation.y += dt * 1.8;
-    ui.tick(ts);
-  }
-
-  renderer.render(scene, camera);
-};
-
-const onKeyChange = (event: KeyboardEvent, pressed: boolean): void => {
-  switch (event.code) {
-    case 'ArrowUp':
-    case 'KeyW':
-      keyState.backward = pressed;
-      break;
-    case 'ArrowDown':
-    case 'KeyS':
-      keyState.forward = pressed;
-      break;
-    case 'ArrowLeft':
-    case 'KeyA':
-      keyState.left = pressed;
-      break;
-    case 'ArrowRight':
-    case 'KeyD':
-      keyState.right = pressed;
-      break;
-    default:
-      return;
-  }
-
-  event.preventDefault();
-};
-
-const resetJoystickVisual = (): void => {
-  joystickKnobEl.style.transform = 'translate(-50%, -50%)';
-};
-
-const handleJoystickMove = (clientX: number, clientY: number): void => {
-  const rect = joystickEl.getBoundingClientRect();
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  const dx = clientX - centerX;
-  const dy = clientY - centerY;
-  const radius = rect.width * 0.33;
-  const len = Math.hypot(dx, dy) || 1;
-  const clamped = Math.min(radius, len);
-  const nx = (dx / len) * clamped;
-  const ny = (dy / len) * clamped;
-
-  joystickState.x = nx / radius;
-  joystickState.y = ny / radius;
-
-  joystickKnobEl.style.transform = `translate(calc(-50% + ${nx}px), calc(-50% + ${ny}px))`;
-};
-
-window.addEventListener('resize', () => {
-  fitCameraToRoom();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
-
-window.addEventListener('keydown', (e: KeyboardEvent) => onKeyChange(e, true));
-window.addEventListener('keyup', (e: KeyboardEvent) => onKeyChange(e, false));
-
-joystickEl.addEventListener(
-  'touchstart',
-  (event: TouchEvent) => {
-    if (joystickState.pointerId !== -1) {
-      return;
-    }
-
-    for (const touch of event.changedTouches) {
-      joystickState.pointerId = touch.identifier;
-      handleJoystickMove(touch.clientX, touch.clientY);
-      break;
-    }
-
-    event.preventDefault();
-  },
-  { passive: false }
-);
-
-joystickEl.addEventListener(
-  'touchmove',
-  (event: TouchEvent) => {
-    for (const touch of event.changedTouches) {
-      if (touch.identifier === joystickState.pointerId) {
-        handleJoystickMove(touch.clientX, touch.clientY);
-      }
-    }
-
-    event.preventDefault();
-  },
-  { passive: false }
-);
-
-window.addEventListener('touchend', (event: TouchEvent) => {
-  for (const touch of event.changedTouches) {
-    if (touch.identifier === joystickState.pointerId) {
-      joystickState.pointerId = -1;
-      joystickState.x = 0;
-      joystickState.y = 0;
-      resetJoystickVisual();
-    }
-  }
-});
-
-window.addEventListener('touchcancel', () => {
-  joystickState.pointerId = -1;
-  joystickState.x = 0;
-  joystickState.y = 0;
-  resetJoystickVisual();
-});
 
 ui.onStart(() => {
   ui.revealGame();
   if (!gameStarted) {
     gameStarted = true;
     levelController.restart();
-    setStatus('Move the character, find the key, unlock the door.');
+    ui.setStatus('Move the character, find the key, unlock the door.');
   }
 });
 
 ui.onRestart(() => {
   levelController.restart();
-  setStatus(`Level ${levelController.currentIndex + 1} restarted.`);
+  ui.setStatus(`Level ${levelController.currentIndex + 1} restarted.`);
 });
 
 ui.onNext(() => {
   levelController.next();
-  setStatus(`Level ${levelController.currentIndex + 1} started.`);
+  ui.setStatus(`Level ${levelController.currentIndex + 1} started.`);
 });
 
 levelController.load(0);
-fitCameraToRoom();
+
+const animate = (ts: number): void => {
+  requestAnimationFrame(animate);
+  const dt = sceneManager.getDelta();
+
+  if (gameStarted) {
+    levelController.update(ts, dt);
+    ui.tick(ts);
+  }
+
+  sceneManager.render();
+};
+
 requestAnimationFrame(animate);
 
-void preloadAssets((ratio) => {
+void preloadAssets(collectLevelAssetUrls(LEVELS), (ratio) => {
   ui.setPreloadProgress(ratio);
 }).then(() => {
   ui.setPreloadReady();
   ui.hidePreloader();
+});
+
+window.addEventListener('beforeunload', () => {
+  levelController.dispose();
+  inputManager.dispose();
+  sceneManager.dispose();
 });

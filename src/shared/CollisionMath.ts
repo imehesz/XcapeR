@@ -16,7 +16,8 @@ export interface RoomCollisionConfig {
   minZ: number;
   maxZ: number;
   playerRadius: number;
-  closedDoorBounds: Aabb2;
+  closedDoorBounds?: Aabb2;
+  obstacleBounds?: Aabb2[];
 }
 
 const intersectsAabb = (a: Aabb2, b: Aabb2): boolean => {
@@ -43,14 +44,19 @@ export const resolvePlayerMovement = (
 ): Vec2 => {
   const clamped = clampInsideRoom(nextPosition, config);
 
-  if (isDoorOpen) {
-    return clamped;
-  }
-
   const nextAabb = playerAabb(clamped, config.playerRadius);
-  if (!intersectsAabb(nextAabb, config.closedDoorBounds)) {
-    return clamped;
+
+  if (!isDoorOpen && config.closedDoorBounds && intersectsAabb(nextAabb, config.closedDoorBounds)) {
+    return previousPosition;
   }
 
-  return previousPosition;
+  if (config.obstacleBounds) {
+    for (const obstacle of config.obstacleBounds) {
+      if (intersectsAabb(nextAabb, obstacle)) {
+        return previousPosition;
+      }
+    }
+  }
+
+  return clamped;
 };

@@ -13,12 +13,12 @@ export class Door {
       new THREE.MeshStandardMaterial({ color: 0x7c4628 })
     );
 
-    fallbackMesh.position.set(0.8, 0, 0);
+    fallbackMesh.position.set(0.8, 1.3, 0);
     this.mesh = fallbackMesh;
 
     this.pivot = new THREE.Group();
     this.pivot.add(fallbackMesh);
-    this.pivot.position.set(this.hingeX, 1.4, 4.45);
+    this.pivot.position.set(this.hingeX, 0, 0);
 
     this.loadMedievalDoor(fallbackMesh);
   }
@@ -87,6 +87,10 @@ export class Door {
     });
   }
 
+  checkUnlockCriteria(keysOwned: number, keysRequired: number): boolean {
+    return keysOwned >= keysRequired;
+  }
+
   lockedShake(): void {
     gsap.fromTo(
       this.pivot.position,
@@ -109,5 +113,21 @@ export class Door {
     gsap.killTweensOf(this.pivot.position);
     this.pivot.rotation.y = 0;
     this.pivot.position.x = this.hingeX;
+  }
+
+  dispose(): void {
+    this.pivot.traverse((child: any) => {
+      if (!(child instanceof THREE.Mesh)) {
+        return;
+      }
+      child.geometry?.dispose?.();
+      if (Array.isArray(child.material)) {
+        for (const material of child.material) {
+          material.dispose?.();
+        }
+      } else {
+        child.material?.dispose?.();
+      }
+    });
   }
 }

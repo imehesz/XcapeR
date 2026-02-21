@@ -1,17 +1,26 @@
 import { type LevelConfig } from './levels';
+import { BaseLevel, type LevelDependencies } from '../levels/BaseLevel';
+import { Level1 } from '../levels/Level1';
+import { Level2 } from '../levels/Level2';
 
 export class LevelController {
-  private currentIndexValue = 0;
   private readonly levels: LevelConfig[];
-  private readonly onLoad: (level: LevelConfig, index: number) => void;
+  private readonly deps: LevelDependencies;
+  private currentLevel: BaseLevel | null = null;
+  private currentIndexValue = 0;
 
-  constructor(levels: LevelConfig[], onLoad: (level: LevelConfig, index: number) => void) {
+  constructor(levels: LevelConfig[], deps: Omit<LevelDependencies, 'onCompleted'> & { onCompleted: (index: number) => void }) {
     if (levels.length === 0) {
       throw new Error('At least one level is required.');
     }
 
     this.levels = levels;
-    this.onLoad = onLoad;
+    this.deps = {
+      ...deps,
+      onCompleted: () => {
+        deps.onCompleted(this.currentIndexValue);
+      }
+    };
   }
 
   get currentIndex(): number {
@@ -19,8 +28,18 @@ export class LevelController {
   }
 
   load(index: number): void {
+    if (this.currentLevel) {
+      this.currentLevel.teardown();
+      this.currentLevel = null;
+    }
+
     this.currentIndexValue = ((index % this.levels.length) + this.levels.length) % this.levels.length;
-    this.onLoad(this.levels[this.currentIndexValue], this.currentIndexValue);
+    const config = this.levels[this.currentIndexValue];
+
+    this.currentLevel = this.createLevel(config);
+    this.currentLevel.initialize();
+    this.deps.ui.setLevelLabel(this.currentIndexValue + 1);
+    this.deps.ui.hideLevelComplete();
   }
 
   restart(): void {
@@ -29,5 +48,27 @@ export class LevelController {
 
   next(): void {
     this.load(this.currentIndexValue + 1);
+  }
+
+  update(ts: number, dt: number): void {
+    this.currentLevel?.update(ts, dt);
+    this.deps.ui.setTimer(this.deps.state.getTimerValue());
+    this.deps.ui.setInventoryActive(this.deps.state.getItemCountByPrefix('key') > 0);
+  }
+
+  dispose(): void {
+    this.currentLevel?.teardown();
+    this.currentLevel = null;
+  }
+
+  private createLevel(config: LevelConfig): BaseLevel {
+    switch (config.id) {
+      case 'level-1':
+        return new Level1(config, this.deps);
+      case 'level-2':
+        return new Level2(config, this.deps);
+      default:
+        return new BaseLevel(config, this.deps);
+    }
   }
 }
