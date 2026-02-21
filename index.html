@@ -229,7 +229,7 @@
     <div id="splash" class="screen">
       <div class="panel">
         <h1 class="title">XcapeR</h1>
-        <p class="subtitle">Level 1 Prototype</p>
+        <p id="splashSubtitle" class="subtitle">Level 1</p>
         <div class="menu">
           <button id="startBtn" class="btn btn-primary">Start Game</button>
           <button id="aboutBtn" class="btn">About</button>
@@ -255,6 +255,17 @@
           Options will be implemented in a later step.
         </p>
         <button id="optionsCloseBtn" class="btn btn-primary">Back</button>
+      </div>
+    </div>
+
+    <div id="levelCompleteModal" class="screen hidden">
+      <div class="panel">
+        <h2 id="levelCompleteTitle" class="title" style="font-size: 1.55rem">Level Complete</h2>
+        <p class="subtitle" style="margin-bottom: 1.1rem">Choose what to do next.</p>
+        <div class="menu">
+          <button id="restartLevelBtn" class="btn">Restart</button>
+          <button id="nextLevelBtn" class="btn btn-primary">Next</button>
+        </div>
       </div>
     </div>
 

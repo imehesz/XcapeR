@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { Door } from './entities/Door';
+import { LEVELS, type LevelConfig } from './game/levels';
+import { LevelController } from './game/LevelController';
+import { UISystem } from './systems/UISystem';
 import {
   createInitialState,
   collectKey,
@@ -18,40 +21,18 @@ const KEY_PICKUP_RADIUS = 0.75;
 const DOOR_TOUCH_RADIUS = 1.05;
 
 const app = document.getElementById('app');
-const splash = document.getElementById('splash');
-const hud = document.getElementById('hud');
-const aboutModal = document.getElementById('aboutModal');
-const optionsModal = document.getElementById('optionsModal');
-const startBtn = document.getElementById('startBtn');
-const aboutBtn = document.getElementById('aboutBtn');
-const optionsBtn = document.getElementById('optionsBtn');
-const aboutCloseBtn = document.getElementById('aboutCloseBtn');
-const optionsCloseBtn = document.getElementById('optionsCloseBtn');
-const timerEl = document.getElementById('timer');
-const inventoryEl = document.getElementById('inventory');
-const statusEl = document.getElementById('status');
 const joystickEl = document.getElementById('joystick');
 const joystickKnobEl = document.getElementById('joystickKnob');
 
 if (
   !app ||
-  !splash ||
-  !hud ||
-  !aboutModal ||
-  !optionsModal ||
-  !startBtn ||
-  !aboutBtn ||
-  !optionsBtn ||
-  !aboutCloseBtn ||
-  !optionsCloseBtn ||
-  !timerEl ||
-  !inventoryEl ||
-  !statusEl ||
   !joystickEl ||
   !joystickKnobEl
 ) {
   throw new Error('Missing required DOM elements.');
 }
+
+const ui = new UISystem();
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
@@ -90,8 +71,8 @@ const roomCollision: RoomCollisionConfig = {
 
 let gameState: GameState = createInitialState();
 let gameStarted = false;
+let levelFinished = false;
 let gameStartTs = performance.now();
-let lastStatusTs = 0;
 
 const keyState = {
   forward: false,
@@ -196,18 +177,18 @@ const player = new THREE.Mesh(
   new THREE.CapsuleGeometry(0.33, 0.65, 4, 8),
   new THREE.MeshStandardMaterial({ color: 0x7ee787, roughness: 0.65 })
 );
-player.position.set(-4, PLAYER_Y, -4);
+player.position.set(LEVELS[0].playerStart.x, PLAYER_Y, LEVELS[0].playerStart.z);
 scene.add(player);
 
 const keyMesh = new THREE.Mesh(
   new THREE.BoxGeometry(0.45, 0.22, 0.22),
   new THREE.MeshStandardMaterial({ color: 0xe9c46a, metalness: 0.35, roughness: 0.2 })
 );
-keyMesh.position.set(4, 0.65, -4);
+keyMesh.position.set(LEVELS[0].keyPosition.x, 0.65, LEVELS[0].keyPosition.z);
 scene.add(keyMesh);
 
 const keyLight = new THREE.PointLight(0xffd76a, 14, 8);
-keyLight.position.set(4, 2.1, -4);
+keyLight.position.set(LEVELS[0].keyPosition.x, 2.1, LEVELS[0].keyPosition.z);
 scene.add(keyLight);
 
 const door = new Door();
@@ -222,21 +203,8 @@ scene.add(doorFrame);
 
 const clock = new THREE.Clock();
 
-const formatTimer = (ms: number): string => {
-  const totalCentiseconds = Math.floor(ms / 10);
-  const centiseconds = totalCentiseconds % 100;
-  const totalSeconds = Math.floor(totalCentiseconds / 100);
-  const seconds = totalSeconds % 60;
-  const minutes = Math.floor(totalSeconds / 60);
-
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}:${String(centiseconds).padStart(2, '0')}`;
-};
-
 const setStatus = (message: string, tone: 'normal' | 'good' = 'normal'): void => {
-  statusEl.textContent = message;
-  statusEl.classList.add('visible');
-  statusEl.classList.toggle('good', tone === 'good');
-  lastStatusTs = performance.now();
+  ui.setStatus(message, tone);
 };
 
 const beep = (frequency: number, durationMs: number): void => {
@@ -263,14 +231,50 @@ const beep = (frequency: number, durationMs: number): void => {
   }, durationMs);
 };
 
+const resetInput = (): void => {
+  keyState.forward = false;
+  keyState.backward = false;
+  keyState.left = false;
+  keyState.right = false;
+  joystickState.pointerId = -1;
+  joystickState.x = 0;
+  joystickState.y = 0;
+  joystickKnobEl.style.transform = 'translate(-50%, -50%)';
+};
+
+const applyLevel = (level: LevelConfig, levelIndex: number): void => {
+  gameState = createInitialState();
+  levelFinished = false;
+  gameStartTs = performance.now();
+  wasTouchingDoor = false;
+  ui.resetStatusTimer();
+
+  player.position.set(level.playerStart.x, PLAYER_Y, level.playerStart.z);
+  player.rotation.y = 0;
+
+  keyMesh.position.set(level.keyPosition.x, 0.65, level.keyPosition.z);
+  keyLight.position.set(level.keyPosition.x, 2.1, level.keyPosition.z);
+  if (!scene.children.includes(keyMesh)) {
+    scene.add(keyMesh);
+  }
+
+  door.reset();
+  resetInput();
+  ui.setLevelLabel(levelIndex + 1);
+  ui.hideLevelComplete();
+  syncHud();
+};
+
+const levelController = new LevelController(LEVELS, applyLevel);
+
 const syncHud = (): void => {
-  timerEl.textContent = formatTimer(gameState.timerValue);
-  inventoryEl.classList.toggle('active', gameState.isKeyCollected);
+  ui.setTimer(gameState.timerValue);
+  ui.setInventoryActive(gameState.isKeyCollected);
 };
 
 const updateMovement = (dt: number): void => {
   const inputX = Number(keyState.right) - Number(keyState.left) + joystickState.x;
-  const inputZ = Number(keyState.forward) - Number(keyState.backward) - joystickState.y;
+  const inputZ = Number(keyState.forward) - Number(keyState.backward) + joystickState.y;
   const length = Math.hypot(inputX, inputZ);
 
   if (length < 0.001) {
@@ -312,6 +316,10 @@ const checkKeyPickup = (): void => {
 };
 
 const checkDoorTouch = (): void => {
+  if (levelFinished) {
+    return;
+  }
+
   if (gameState.isDoorOpen) {
     wasTouchingDoor = true;
     return;
@@ -340,9 +348,11 @@ const checkDoorTouch = (): void => {
 
   gameState = openDoor(gameState);
   void door.open();
+  levelFinished = true;
   setStatus('Door opened. You escaped.', 'good');
   beep(880, 180);
   syncHud();
+  ui.showLevelComplete(levelController.currentIndex + 1);
   wasTouchingDoor = true;
 };
 
@@ -350,20 +360,19 @@ const animate = (ts: number): void => {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
 
-  if (!gameState.isDoorOpen) {
+  if (gameStarted && !levelFinished && !gameState.isDoorOpen) {
     gameState = updateTimer(gameState, ts - gameStartTs);
     syncHud();
   }
 
   if (gameStarted) {
-    updateMovement(dt);
-    checkKeyPickup();
-    checkDoorTouch();
-    keyMesh.rotation.y += dt * 1.8;
-
-    if (statusEl.classList.contains('visible') && ts - lastStatusTs > 1800) {
-      statusEl.classList.remove('visible');
+    if (!levelFinished) {
+      updateMovement(dt);
+      checkKeyPickup();
+      checkDoorTouch();
     }
+    keyMesh.rotation.y += dt * 1.8;
+    ui.tick(ts);
   }
 
   renderer.render(scene, camera);
@@ -416,11 +425,6 @@ const handleJoystickMove = (clientX: number, clientY: number): void => {
   joystickKnobEl.style.transform = `translate(calc(-50% + ${nx}px), calc(-50% + ${ny}px))`;
 };
 
-const isInside = (el: HTMLElement, clientX: number, clientY: number): boolean => {
-  const rect = el.getBoundingClientRect();
-  return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
-};
-
 window.addEventListener('resize', () => {
   fitCameraToRoom();
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -429,20 +433,25 @@ window.addEventListener('resize', () => {
 window.addEventListener('keydown', (e: KeyboardEvent) => onKeyChange(e, true));
 window.addEventListener('keyup', (e: KeyboardEvent) => onKeyChange(e, false));
 
-renderer.domElement.addEventListener(
+joystickEl.addEventListener(
   'touchstart',
   (event: TouchEvent) => {
-    for (const touch of event.changedTouches) {
-      if (isInside(joystickEl, touch.clientX, touch.clientY) && joystickState.pointerId === -1) {
-        joystickState.pointerId = touch.identifier;
-        handleJoystickMove(touch.clientX, touch.clientY);
-      }
+    if (joystickState.pointerId !== -1) {
+      return;
     }
+
+    for (const touch of event.changedTouches) {
+      joystickState.pointerId = touch.identifier;
+      handleJoystickMove(touch.clientX, touch.clientY);
+      break;
+    }
+
+    event.preventDefault();
   },
   { passive: false }
 );
 
-renderer.domElement.addEventListener(
+joystickEl.addEventListener(
   'touchmove',
   (event: TouchEvent) => {
     for (const touch of event.changedTouches) {
@@ -456,7 +465,7 @@ renderer.domElement.addEventListener(
   { passive: false }
 );
 
-renderer.domElement.addEventListener('touchend', (event: TouchEvent) => {
+window.addEventListener('touchend', (event: TouchEvent) => {
   for (const touch of event.changedTouches) {
     if (touch.identifier === joystickState.pointerId) {
       joystickState.pointerId = -1;
@@ -467,40 +476,32 @@ renderer.domElement.addEventListener('touchend', (event: TouchEvent) => {
   }
 });
 
-renderer.domElement.addEventListener('touchcancel', () => {
+window.addEventListener('touchcancel', () => {
   joystickState.pointerId = -1;
   joystickState.x = 0;
   joystickState.y = 0;
   resetJoystickVisual();
 });
 
-startBtn.addEventListener('click', () => {
-  splash.classList.add('hidden');
-  hud.classList.remove('hidden');
-
+ui.onStart(() => {
+  ui.revealGame();
   if (!gameStarted) {
     gameStarted = true;
-    syncHud();
+    levelController.restart();
     setStatus('Move the character, find the key, unlock the door.');
   }
 });
 
-aboutBtn.addEventListener('click', () => {
-  aboutModal.classList.remove('hidden');
+ui.onRestart(() => {
+  levelController.restart();
+  setStatus(`Level ${levelController.currentIndex + 1} restarted.`);
 });
 
-optionsBtn.addEventListener('click', () => {
-  optionsModal.classList.remove('hidden');
+ui.onNext(() => {
+  levelController.next();
+  setStatus(`Level ${levelController.currentIndex + 1} started.`);
 });
 
-aboutCloseBtn.addEventListener('click', () => {
-  aboutModal.classList.add('hidden');
-});
-
-optionsCloseBtn.addEventListener('click', () => {
-  optionsModal.classList.add('hidden');
-});
-
-syncHud();
+levelController.load(0);
 fitCameraToRoom();
 requestAnimationFrame(animate);

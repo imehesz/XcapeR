@@ -49,4 +49,11 @@ export class Door {
       }
     );
   }
+
+  reset(): void {
+    gsap.killTweensOf(this.pivot.rotation);
+    gsap.killTweensOf(this.pivot.position);
+    this.pivot.rotation.y = 0;
+    this.pivot.position.x = -0.8;
+  }
 }
