@@ -159,7 +159,7 @@ export const LEVELS: LevelConfig[] = [
         transform: {
           position: { x: -2.2, y: 0, z: 1.6 },
           rotationY: Math.PI * 0.35,
-          scale: 1
+          scale: 0.75
         },
         interaction: {
           type: 'ambient',

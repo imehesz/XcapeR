@@ -285,25 +285,51 @@ export class BaseLevel {
     loader.load(
       config.assetUrl,
       (object: any) => {
-        const bounds = new THREE.Box3().setFromObject(object);
-        const center = bounds.getCenter(new THREE.Vector3());
-        const yOffset = -bounds.min.y;
-        object.position.set(-center.x, yOffset, -center.z);
-
+        let texture: any;
         if (config.textureUrl) {
-          const texture = new THREE.TextureLoader().load(config.textureUrl);
+          texture = new THREE.TextureLoader().load(config.textureUrl);
           texture.colorSpace = THREE.SRGBColorSpace;
-          object.traverse((child: any) => {
-            if (child instanceof THREE.Mesh) {
-              child.material = new THREE.MeshStandardMaterial({
-                map: texture,
-                roughness: 0.8,
-                metalness: 0.04
-              });
-            }
-          });
-          this.disposers.push(() => texture.dispose?.());
+          this.disposers.push(() => texture?.dispose?.());
         }
+
+        object.traverse((child: any) => {
+          if (!(child instanceof THREE.Mesh)) {
+            return;
+          }
+
+          if (!child.geometry.getAttribute('normal')) {
+            child.geometry.computeVertexNormals();
+          }
+
+          child.castShadow = false;
+          child.receiveShadow = false;
+          child.material = texture
+            ? new THREE.MeshStandardMaterial({
+              map: texture,
+              roughness: 0.8,
+              metalness: 0.04
+            })
+            : new THREE.MeshStandardMaterial({
+              color: config.type === 'cat' ? 0xd9b37a : 0x9bb0c9,
+              roughness: 0.86,
+              metalness: 0.03,
+              flatShading: config.type === 'cat'
+            });
+        });
+
+        // Keep imported assets at a usable in-room size.
+        const rawBounds = new THREE.Box3().setFromObject(object);
+        const rawSize = rawBounds.getSize(new THREE.Vector3());
+        if (config.type === 'cat' && rawSize.y > 0.0001) {
+          const targetHeight = 1.1;
+          const uniformScale = targetHeight / rawSize.y;
+          object.scale.setScalar(uniformScale);
+        }
+
+        const fittedBounds = new THREE.Box3().setFromObject(object);
+        const center = fittedBounds.getCenter(new THREE.Vector3());
+        const yOffset = -fittedBounds.min.y;
+        object.position.set(-center.x, yOffset, -center.z);
 
         anchor.add(object);
       },
