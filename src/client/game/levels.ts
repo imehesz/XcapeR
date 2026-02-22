@@ -155,7 +155,6 @@ export const LEVELS: LevelConfig[] = [
       {
         id: 'cat.pet',
         type: 'cat',
-        assetUrl: assetUrl('models/lowpolycat/cat.obj'),
         transform: {
           position: { x: -2.2, y: 0, z: 1.6 },
           rotationY: Math.PI * 0.35,
