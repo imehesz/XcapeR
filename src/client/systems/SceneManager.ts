@@ -12,11 +12,13 @@ export class SceneManager {
 
   private readonly app: HTMLElement;
   private lightNodes: any[] = [];
+  private starfieldTexture: any | null = null;
 
   constructor(app: HTMLElement) {
     this.app = app;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x000000);
+    this.starfieldTexture = this.createStarfieldTexture();
+    this.scene.background = this.starfieldTexture;
 
     const cameraAspect = window.innerWidth / window.innerHeight;
     this.camera = new THREE.OrthographicCamera(-8 * cameraAspect, 8 * cameraAspect, 8, -8, 0.1, 100);
@@ -111,10 +113,46 @@ export class SceneManager {
 
   dispose(): void {
     window.removeEventListener('resize', this.onResize);
+    this.starfieldTexture?.dispose();
+    this.starfieldTexture = null;
     this.renderer.dispose();
   }
 
   private readonly onResize = (): void => {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   };
+
+  private createStarfieldTexture(): any {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      return new THREE.Color(0x000000);
+    }
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#070b1b');
+    gradient.addColorStop(1, '#02040c');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const starCount = 420;
+    for (let i = 0; i < starCount; i += 1) {
+      const x = Math.random() * canvas.width;
+      const y = Math.random() * canvas.height;
+      const radius = Math.random() * 1.2 + 0.15;
+      const alpha = Math.random() * 0.65 + 0.2;
+
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(245, 250, 255, ${alpha})`;
+      ctx.fill();
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
 }

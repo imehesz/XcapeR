@@ -205,7 +205,7 @@ export class UISystem {
   }
 
   setLevelLabel(levelNumber: number): void {
-    this.splashSubtitleEl.textContent = `Level ${levelNumber}`;
+   // this.splashSubtitleEl.textContent = `Level ${levelNumber}`;
   }
 
   showLevelComplete(levelNumber: number): void {

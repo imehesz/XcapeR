@@ -10,6 +10,51 @@ const PLAYER_Y = 0.45;
 const TOTAL_LEVEL_SLOTS = 9;
 const STORAGE_KEY_UNLOCKED = 'xcaper.maxUnlockedPlayableLevel';
 
+const createPlayerSunglasses = () => {
+  const glasses = new THREE.Group();
+  const frameMaterial = new THREE.MeshStandardMaterial({
+    color: 0x101216,
+    roughness: 0.4,
+    metalness: 0.2,
+    flatShading: true
+  });
+  const lensMaterial = new THREE.MeshStandardMaterial({
+    color: 0x0f1726,
+    roughness: 0.15,
+    metalness: 0.5,
+    flatShading: true
+  });
+
+  const lensGeometry = new THREE.BoxGeometry(0.22, 0.11, 0.03);
+  const leftLens = new THREE.Mesh(lensGeometry, lensMaterial);
+  leftLens.position.set(-0.14, 0.2, 0.3);
+  glasses.add(leftLens);
+
+  const rightLens = leftLens.clone();
+  rightLens.position.x = 0.14;
+  glasses.add(rightLens);
+
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.035, 0.03), frameMaterial);
+  bridge.position.set(0, 0.2, 0.3);
+  glasses.add(bridge);
+
+  const topBar = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.03, 0.03), frameMaterial);
+  topBar.position.set(0, 0.245, 0.3);
+  glasses.add(topBar);
+
+  const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.2), frameMaterial);
+  leftArm.position.set(-0.26, 0.2, 0.22);
+  leftArm.rotation.y = 0.25;
+  glasses.add(leftArm);
+
+  const rightArm = leftArm.clone();
+  rightArm.position.x = 0.26;
+  rightArm.rotation.y = -0.25;
+  glasses.add(rightArm);
+
+  return glasses;
+};
+
 const app = document.getElementById('app');
 const joystickEl = document.getElementById('joystick');
 const joystickKnobEl = document.getElementById('joystickKnob');
@@ -27,6 +72,7 @@ const player = new THREE.Mesh(
   new THREE.CapsuleGeometry(0.33, 0.65, 4, 8),
   new THREE.MeshStandardMaterial({ color: 0x7ee787, roughness: 0.65 })
 );
+player.add(createPlayerSunglasses());
 player.position.set(0, PLAYER_Y, 0);
 sceneManager.scene.add(player);
 
