@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { type EnvironmentConfig } from '../game/levels';
 
 const FIT_MARGIN = 1.12;
+const MOBILE_ZOOM_IN_FACTOR = 0.6;
 
 export class SceneManager {
   public readonly scene: any;
@@ -13,6 +14,8 @@ export class SceneManager {
   private readonly app: HTMLElement;
   private lightNodes: any[] = [];
   private starfieldTexture: any | null = null;
+  private currentRoomHalf: number | null = null;
+  private currentWallHeight: number | null = null;
 
   constructor(app: HTMLElement) {
     this.app = app;
@@ -57,6 +60,9 @@ export class SceneManager {
   }
 
   fitCameraToRoom(roomHalf: number, wallHeight: number): void {
+    this.currentRoomHalf = roomHalf;
+    this.currentWallHeight = wallHeight;
+
     const aspect = window.innerWidth / window.innerHeight;
     const roomBounds = new THREE.Box3(
       new THREE.Vector3(-roomHalf, 0, -roomHalf),
@@ -91,8 +97,9 @@ export class SceneManager {
 
     const centerX = (minX + maxX) * 0.5;
     const centerY = (minY + maxY) * 0.5;
-    const halfWidth = ((maxX - minX) * 0.5) * FIT_MARGIN;
-    const halfHeight = ((maxY - minY) * 0.5) * FIT_MARGIN;
+    const fitMargin = this.getFitMargin();
+    const halfWidth = ((maxX - minX) * 0.5) * fitMargin;
+    const halfHeight = ((maxY - minY) * 0.5) * fitMargin;
     const fittedHalfHeight = Math.max(halfHeight, halfWidth / aspect);
     const fittedHalfWidth = fittedHalfHeight * aspect;
 
@@ -120,7 +127,16 @@ export class SceneManager {
 
   private readonly onResize = (): void => {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+
+    if (this.currentRoomHalf !== null && this.currentWallHeight !== null) {
+      this.fitCameraToRoom(this.currentRoomHalf, this.currentWallHeight);
+    }
   };
+
+  private getFitMargin(): number {
+    const isMobile = window.matchMedia('(pointer: coarse)').matches;
+    return isMobile ? FIT_MARGIN * MOBILE_ZOOM_IN_FACTOR : FIT_MARGIN;
+  }
 
   private createStarfieldTexture(): any {
     const canvas = document.createElement('canvas');
