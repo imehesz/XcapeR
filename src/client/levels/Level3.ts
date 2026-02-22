@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { PickupKey } from '../entities/PickupKey';
 import { BaseLevel } from './BaseLevel';
 
 type MarkSymbol = 'X' | 'O';
@@ -35,8 +34,7 @@ const WIN_LINES = [
 
 export class Level3 extends BaseLevel {
   private readonly boardCells: BoardCell[] = [];
-  private keyPickup: PickupKey | null = null;
-  private keyCollected = false;
+  private keyRevealed = false;
   private puzzleLocked = false;
   private activeSymbol: ActiveSymbol = null;
   private wasOnOButton = false;
@@ -48,8 +46,7 @@ export class Level3 extends BaseLevel {
   override initialize(): void {
     super.initialize();
     this.boardCells.length = 0;
-    this.keyPickup = null;
-    this.keyCollected = false;
+    this.keyRevealed = false;
     this.puzzleLocked = false;
     this.activeSymbol = null;
     this.wasOnOButton = false;
@@ -61,23 +58,12 @@ export class Level3 extends BaseLevel {
   }
 
   override teardown(): void {
-    if (this.keyPickup) {
-      this.keyPickup.dispose(this.worldRoot);
-      this.keyPickup = null;
-    }
+    this.keyRevealed = false;
     this.boardCells.length = 0;
     super.teardown();
   }
 
-  protected override updateCustom(ts: number, dt: number): void {
-    if (this.keyPickup && !this.keyCollected) {
-      this.keyPickup.update(dt);
-      if (this.keyPickup.tryPickup(this.getVirtualPlayerPosition())) {
-        this.keyPickup.removeFrom(this.worldRoot);
-        this.keyCollected = true;
-      }
-    }
-
+  protected override updateCustom(ts: number, _dt: number): void {
     this.animateLetters(ts);
     if (this.puzzleLocked) {
       return;
@@ -337,22 +323,20 @@ export class Level3 extends BaseLevel {
   }
 
   private revealKey(): void {
-    if (this.keyPickup || this.puzzleLocked) {
+    if (this.keyRevealed || this.puzzleLocked) {
       return;
     }
 
     this.puzzleLocked = true;
-    this.keyPickup = new PickupKey(
+    this.createCarryableKey(
       { x: 0, y: 0.65, z: 2.95 },
       0.75,
       'key.main',
-      (itemId: string) => {
-        this.deps.state.addItem(itemId);
-        this.deps.ui.setInventoryActive(this.deps.state.getItemCountByPrefix('key') > 0);
-        this.deps.ui.setStatus('Tic-tac-toe solved. Key collected.', 'good');
+      {
+        collectedStatus: 'Tic-tac-toe solved. Carry the key to the door.'
       }
     );
-    this.keyPickup.addTo(this.worldRoot);
+    this.keyRevealed = true;
     this.deps.ui.setStatus('Tic-tac-toe solved. A key has appeared.', 'good');
   }
 }

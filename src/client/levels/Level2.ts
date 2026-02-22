@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { PickupKey } from '../entities/PickupKey';
 import { BaseLevel } from './BaseLevel';
 
 type PieceKind = 'block' | 'ball' | 'pyramid';
@@ -17,22 +16,16 @@ export class Level2 extends BaseLevel {
   private readonly pieces: PuzzlePiece[] = [];
   private readonly outlines: any[] = [];
   private carriedPiece: PuzzlePiece | null = null;
-  private keyPickup: PickupKey | null = null;
-  private keyCollected = false;
+  private keyRevealed = false;
 
   override initialize(): void {
     super.initialize();
-    this.keyCollected = false;
+    this.keyRevealed = false;
     this.carriedPiece = null;
     this.createPuzzleObjects();
   }
 
   override teardown(): void {
-    if (this.keyPickup) {
-      this.keyPickup.dispose(this.worldRoot);
-      this.keyPickup = null;
-    }
-
     for (const piece of this.pieces) {
       this.worldRoot.remove(piece.mesh);
       piece.mesh.geometry?.dispose?.();
@@ -54,19 +47,12 @@ export class Level2 extends BaseLevel {
     this.outlines.length = 0;
 
     this.carriedPiece = null;
+    this.keyRevealed = false;
     super.teardown();
   }
 
-  protected override updateCustom(_ts: number, dt: number): void {
+  protected override updateCustom(_ts: number, _dt: number): void {
     const player = this.getVirtualPlayerPosition();
-
-    if (this.keyPickup && !this.keyCollected) {
-      this.keyPickup.update(dt);
-      if (this.keyPickup.tryPickup(player)) {
-        this.keyPickup.removeFrom(this.worldRoot);
-        this.keyCollected = true;
-      }
-    }
 
     if (this.isPuzzleSolved()) {
       return;
@@ -180,21 +166,19 @@ export class Level2 extends BaseLevel {
   }
 
   private revealKey(): void {
-    if (this.keyPickup) {
+    if (this.keyRevealed) {
       return;
     }
 
-    this.keyPickup = new PickupKey(
+    this.createCarryableKey(
       { x: 3.5, y: 0.65, z: 3.4 },
       0.75,
       'key.main',
-      (itemId: string) => {
-        this.deps.state.addItem(itemId);
-        this.deps.ui.setInventoryActive(this.deps.state.getItemCountByPrefix('key') > 0);
-        this.deps.ui.setStatus('A key appeared. Picked up.', 'good');
+      {
+        collectedStatus: 'Puzzle solved. Carry the key to the door.'
       }
     );
-    this.keyPickup.addTo(this.worldRoot);
+    this.keyRevealed = true;
     this.deps.ui.setStatus('All shapes matched. A key has appeared.', 'good');
   }
 

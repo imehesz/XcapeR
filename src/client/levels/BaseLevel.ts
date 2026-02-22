@@ -29,6 +29,7 @@ export class BaseLevel {
 
   private readonly disposers: Array<() => void> = [];
   private readonly pickups: PickupKey[] = [];
+  private readonly carriedKeys: PickupKey[] = [];
 
   private collisionSystem: CollisionSystem;
   private door: Door | null = null;
@@ -62,6 +63,7 @@ export class BaseLevel {
     this.startTs = performance.now();
     this.finished = false;
     this.wasTouchingDoor = false;
+    this.carriedKeys.length = 0;
 
     this.deps.sceneManager.setEnvironment(this.config.environment);
     this.deps.sceneManager.fitCameraToRoom(this.config.environment.roomHalf, this.config.environment.wallHeight);
@@ -88,6 +90,7 @@ export class BaseLevel {
     if (!this.finished) {
       this.updateMovement(dt);
       this.checkKeyPickups();
+      this.updateCarriedKeys();
       this.checkDoorTouch();
       this.updateCustom(ts, dt);
     }
@@ -102,6 +105,7 @@ export class BaseLevel {
       pickup.dispose(this.worldRoot);
     }
     this.pickups.length = 0;
+    this.carriedKeys.length = 0;
 
     if (this.door) {
       this.worldRoot.remove(this.door.object3D);
@@ -253,20 +257,33 @@ export class BaseLevel {
     this.doorObject = config;
   }
 
-  private spawnKey(config: LevelObjectConfig): void {
-    const pickup = new PickupKey(
-      config.transform.position,
-      config.interaction?.pickupRadius ?? 0.75,
-      config.interaction?.itemId ?? config.id,
-      (itemId: string) => {
-        this.deps.state.addItem(itemId);
-        this.deps.ui.setInventoryActive(this.deps.state.getItemCountByPrefix('key') > 0);
-        this.deps.ui.setStatus('Key collected.', 'good');
-        this.playBeep(740, 120);
-      }
-    );
+  protected createCarryableKey(
+    position: { x: number; y: number; z: number },
+    pickupRadius: number,
+    itemId: string,
+    options?: {
+      collectedStatus?: string;
+      onCollected?: (itemId: string) => void;
+    }
+  ): PickupKey {
+    const pickup = new PickupKey(position, pickupRadius, itemId, (pickedItemId: string) => {
+      this.deps.state.addItem(pickedItemId);
+      this.deps.ui.setInventoryActive(this.deps.state.getItemCountByPrefix('key') > 0);
+      this.deps.ui.setStatus(options?.collectedStatus ?? 'Key collected. Carry it to the door.', 'good');
+      this.playBeep(740, 120);
+      options?.onCollected?.(pickedItemId);
+    });
     pickup.addTo(this.worldRoot);
     this.pickups.push(pickup);
+    return pickup;
+  }
+
+  private spawnKey(config: LevelObjectConfig): void {
+    this.createCarryableKey(
+      config.transform.position,
+      config.interaction?.pickupRadius ?? 0.75,
+      config.interaction?.itemId ?? config.id
+    );
   }
 
   private spawnModelObject(config: LevelObjectConfig): void {
@@ -368,7 +385,19 @@ export class BaseLevel {
       if (!picked) {
         continue;
       }
-      pickup.removeFrom(this.worldRoot);
+      this.carriedKeys.push(pickup);
+    }
+  }
+
+  private updateCarriedKeys(): void {
+    if (this.carriedKeys.length === 0) {
+      return;
+    }
+
+    const heading = this.deps.playerMesh.rotation.y;
+    for (let i = 0; i < this.carriedKeys.length; i += 1) {
+      const key = this.carriedKeys[i];
+      key.setCarryPose(this.virtualPlayer, heading, i);
     }
   }
 
