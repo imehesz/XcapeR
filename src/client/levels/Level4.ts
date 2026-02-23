@@ -135,8 +135,10 @@ export class Level4 extends BaseLevel {
       metalness: 0.02
     });
 
-    const screen = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.25, 3.45), this.screenMaterial);
-    screen.position.set(-4.93, 2.1, 0);
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.25, 1.25), this.screenMaterial);
+    //screen.position.set(-4.93, 2.1, 0);
+    screen.position.set(7, 5, 0);
+    screen.rotation.y = Math.PI / 2;
     this.worldRoot.add(screen);
 
     const frame = new THREE.Mesh(
@@ -144,7 +146,7 @@ export class Level4 extends BaseLevel {
       new THREE.MeshStandardMaterial({ color: 0x111317, roughness: 0.82, metalness: 0.2 })
     );
     frame.position.set(-4.98, 2.1, 0);
-    this.worldRoot.add(frame);
+    //this.worldRoot.add(frame);
   }
 
   private createButtons(): void {
@@ -300,14 +302,14 @@ export class Level4 extends BaseLevel {
     const onLeft = Math.hypot(player.x - LEFT_BUTTON_POS.x, player.z - LEFT_BUTTON_POS.z) <= BUTTON_RADIUS;
     if (onLeft && !this.wasOnLeftButton) {
       this.resetSquares();
-      this.deps.ui.setStatus('Squares reset. Sequence is unchanged.');
+      this.deps.ui.setStatus('Squares reset.');
     }
     this.wasOnLeftButton = onLeft;
 
     const onRight = Math.hypot(player.x - RIGHT_BUTTON_POS.x, player.z - RIGHT_BUTTON_POS.z) <= BUTTON_RADIUS;
     if (onRight && !this.wasOnRightButton) {
       this.startSequence(ts);
-      this.deps.ui.setStatus('Sequence playing. Match the 9 squares in order.');
+      this.deps.ui.setStatus('Solve this colorful puzzle.');
     }
     this.wasOnRightButton = onRight;
   }
