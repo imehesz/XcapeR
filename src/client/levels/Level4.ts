@@ -136,9 +136,8 @@ export class Level4 extends BaseLevel {
     });
 
     const screen = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.25, 1.25), this.screenMaterial);
-    //screen.position.set(-4.93, 2.1, 0);
-    screen.position.set(7, 5, 0);
-    screen.rotation.y = Math.PI / 2;
+    screen.position.set(2.8, 2.1, -4.82);
+    screen.rotation.y = 0;
     this.worldRoot.add(screen);
 
     const frame = new THREE.Mesh(

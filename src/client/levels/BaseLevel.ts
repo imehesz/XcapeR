@@ -89,6 +89,7 @@ export class BaseLevel {
 
     if (!this.finished) {
       this.updateMovement(dt);
+      this.resolveCustomCollisions();
       this.checkKeyPickups();
       this.updateCarriedKeys();
       this.checkDoorTouch();
@@ -130,6 +131,10 @@ export class BaseLevel {
 
   protected updateCustom(_ts: number, _dt: number): void {
     // Intended override point for level-specific behavior.
+  }
+
+  protected resolveCustomCollisions(): void {
+    // Intended override point for level-specific collision blockers.
   }
 
   protected getObjectAnchor(id: string): any | undefined {
