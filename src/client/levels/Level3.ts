@@ -19,6 +19,8 @@ const CELL_TOUCH_RADIUS = 0.5;
 const BOARD_TILE_SIZE = 0.9;
 const BOARD_TILE_GAP = 0.2;
 const BOARD_CENTER_Z = 0;
+const BOARD_OUTLINE_COLOR = 0x7aa7ff;
+const BOARD_OUTLINE_Y = 0.125;
 const O_BUTTON_POS = { x: -1.45, z: -3.65 };
 const X_BUTTON_POS = { x: 1.45, z: -3.65 };
 const WIN_LINES = [
@@ -155,6 +157,12 @@ export class Level3 extends BaseLevel {
       metalness: 0.08,
       flatShading: true
     });
+    const outlineMaterial = new THREE.LineBasicMaterial({
+      color: BOARD_OUTLINE_COLOR,
+      transparent: true,
+      opacity: 0.85,
+      depthTest: true
+    });
 
     for (let row = 0; row < 3; row += 1) {
       for (let col = 0; col < 3; col += 1) {
@@ -164,6 +172,13 @@ export class Level3 extends BaseLevel {
         const tile = new THREE.Mesh(new THREE.BoxGeometry(BOARD_TILE_SIZE, 0.08, BOARD_TILE_SIZE), tileMaterial);
         tile.position.set(x, 0.04, z);
         this.worldRoot.add(tile);
+
+        const outlineGeometry = new THREE.EdgesGeometry(
+          new THREE.BoxGeometry(BOARD_TILE_SIZE, 0.02, BOARD_TILE_SIZE)
+        );
+        const outline = new THREE.LineSegments(outlineGeometry, outlineMaterial);
+        outline.position.set(x, BOARD_OUTLINE_Y, z);
+        this.worldRoot.add(outline);
 
         const xMarker = this.createBoardXMarker();
         xMarker.position.set(x, 0.11, z);

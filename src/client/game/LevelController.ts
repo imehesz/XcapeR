@@ -3,6 +3,7 @@ import { BaseLevel, type LevelDependencies } from '../levels/BaseLevel';
 import { Level1 } from '../levels/Level1';
 import { Level2 } from '../levels/Level2';
 import { Level3 } from '../levels/Level3';
+import { Level4 } from '../levels/Level4';
 
 export class LevelController {
   private readonly levels: LevelConfig[];
@@ -70,6 +71,8 @@ export class LevelController {
         return new Level2(config, this.deps);
       case 'level-3':
         return new Level3(config, this.deps);
+      case 'level-4':
+        return new Level4(config, this.deps);
       default:
         return new BaseLevel(config, this.deps);
     }
