@@ -98,6 +98,8 @@ export class Level5 extends BaseLevel {
   protected override updateCustom(_ts: number, dt: number): void {
     if (this.isSolved) return;
 
+    this.targetBoxGroup.rotation.y -= 0.5 * dt;
+
     // 1. Update Timer
     this.timer -= dt;
     if (this.timer <= 0) {
