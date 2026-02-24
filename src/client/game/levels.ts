@@ -400,6 +400,56 @@ export const LEVELS: LevelConfig[] = [
         }
       }
     ]
+  },
+
+  {
+    id: 'level-6',
+    name: 'Level 6',
+    environment: {
+      roomHalf: 5,
+      wallHeight: 5,
+      wallColor: 0x05070a, // Super dark for the glitch effect
+      wallOpacity: 0.9,
+      floorColor: 0x020305,
+      visibleWalls: { left: true, back: true, right: false, front: false },
+      lighting: {
+        ambientIntensity: 0.2, // Very dim
+        directional: [
+          { color: 0xffffff, intensity: 0.2, position: { x: 7, y: 10, z: 4 } }
+        ]
+      }
+    },
+    player: {
+      spawn: { x: 0, z: 4.5 },
+      rotationY: 0,
+      speed: 3.1,
+      radius: 0.38
+    },
+    winCondition: {
+      doorObjectId: 'door.exit',
+      keysRequired: 1
+    },
+    objects: [
+      {
+        id: 'door.exit',
+        type: 'door',
+        transform: { position: { x: 0, y: 0, z: -4.9 }, rotationY: 0, scale: 1 },
+        collision: { isCollidable: true, halfX: 0.95, halfZ: 0.42 },
+        interaction: { type: 'exit', touchRadius: 1.05 }
+      },
+      {
+        id: 'key.main',
+        type: 'key',
+        transform: { position: { x: 0, y: 0.65, z: 0 }, rotationY: 0, scale: 1 },
+        interaction: { type: 'pickup', pickupRadius: 0.75, itemId: 'key.main' }
+      },
+      {
+        id: 'cat.pet',
+        type: 'cat',
+        transform: { position: { x: 0, y: 0, z: 0 }, rotationY: Math.PI * 0.35, scale: 0.75 },
+        interaction: { type: 'ambient', touchRadius: 0.85 }
+      }
+    ]
   }
 ];
 
