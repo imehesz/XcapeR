@@ -1,4 +1,5 @@
 import { formatTimer } from '../game/timer';
+import gameMusicUrl from '../../../assets/audio/game-music.mp3';
 
 type StatusTone = 'normal' | 'good';
 
@@ -74,6 +75,7 @@ export class UISystem {
     // Options UI setup
     this.updateOptionsUI();
     this.applyMusicVolume();
+    this.bgMusic.src = gameMusicUrl;
 
     // Color Picker
     this.colorBtns.forEach(btn => {
