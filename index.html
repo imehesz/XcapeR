@@ -303,7 +303,33 @@
           transform: none;
         }
       }
+
+  .color-btn {
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    padding: 0;
+    transition: transform 0.1s;
+  }
+  .color-btn:active { transform: scale(0.9); }
+  .color-btn.selected { border-color: white; box-shadow: 0 0 8px rgba(255,255,255,0.8); }
+  .vol-controls {
+    display: flex; align-items: center; gap: 1rem;
+  }
+  .vol-btn {
+    width: 2.5rem; padding: 0.4rem;
+  }
+  .options-row {
+    display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;
+  }
+
+
     </style>
+
+    <audio id="bgMusic" src="assets/audio/game-music.mp3" loop preload="auto"></audio>
+
   </head>
   <body>
     <div id="app"></div>
@@ -379,15 +405,49 @@
       </div>
     </div>
 
-    <div id="optionsModal" class="screen hidden">
-      <div class="panel">
-        <h2 class="title" style="font-size: 1.55rem">Options</h2>
-        <p class="subtitle" style="margin-bottom: 1.1rem">
-          Options will be implemented in a later step.
-        </p>
-        <button id="optionsCloseBtn" class="btn btn-primary">Back</button>
+<div id="optionsModal" class="screen hidden">
+  <div class="panel">
+    <h2 class="title" style="font-size: 1.55rem">Options</h2>
+    
+    <div class="menu" style="margin-bottom: 1.5rem; text-align: left;">
+      <div>
+        <label style="color: var(--muted); font-size: 0.9rem; text-transform: uppercase;">Player Color</label>
+        <div id="colorPicker" style="display: flex; gap: 0.5rem; margin-top: 0.5rem; justify-content: space-between;">
+          <button class="color-btn selected" data-color="0x7ee787" style="background: #7ee787;"></button>
+          <button class="color-btn" data-color="0xe9c46a" style="background: #e9c46a;"></button>
+          <button class="color-btn" data-color="0xe76f51" style="background: #e76f51;"></button>
+          <button class="color-btn" data-color="0x2a9d8f" style="background: #2a9d8f;"></button>
+          <button class="color-btn" data-color="0x457b9d" style="background: #457b9d;"></button>
+          <button class="color-btn" data-color="0x9d4edd" style="background: #9d4edd;"></button>
+          <button class="color-btn" data-color="0xffb703" style="background: #ffb703;"></button>
+          <button class="color-btn" data-color="0xffffff" style="background: #ffffff;"></button>
+        </div>
+      </div>
+
+      <div class="options-row">
+        <label style="color: var(--muted); font-size: 0.9rem; text-transform: uppercase;">Sound FX</label>
+        <div class="vol-controls">
+          <button id="sfxDecBtn" class="btn vol-btn">-</button>
+          <span id="sfxVolLabel" style="width: 1.5rem; text-align: center;">5</span>
+          <button id="sfxIncBtn" class="btn vol-btn">+</button>
+        </div>
+      </div>
+
+      <div class="options-row">
+        <label style="color: var(--muted); font-size: 0.9rem; text-transform: uppercase;">Music</label>
+        <div class="vol-controls">
+          <button id="musicDecBtn" class="btn vol-btn">-</button>
+          <span id="musicVolLabel" style="width: 1.5rem; text-align: center;">5</span>
+          <button id="musicIncBtn" class="btn vol-btn">+</button>
+        </div>
       </div>
     </div>
+
+    <button id="optionsCloseBtn" class="btn btn-primary">Back</button>
+  </div>
+</div>
+
+
 
     <div id="levelCompleteModal" class="screen hidden">
       <div class="panel">

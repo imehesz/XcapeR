@@ -36,6 +36,21 @@ export class UISystem {
   private readonly timerEl = asHTMLElement('timer');
   private readonly inventoryEl = asHTMLElement('inventory');
   private readonly statusEl = asHTMLElement('status');
+  private readonly colorBtns = document.querySelectorAll('.color-btn');
+  private readonly sfxDecBtn = asHTMLElement('sfxDecBtn');
+  private readonly sfxIncBtn = asHTMLElement('sfxIncBtn');
+  private readonly sfxVolLabel = asHTMLElement('sfxVolLabel');
+  private readonly musicDecBtn = asHTMLElement('musicDecBtn');
+  private readonly musicIncBtn = asHTMLElement('musicIncBtn');
+  private readonly musicVolLabel = asHTMLElement('musicVolLabel');
+  private readonly bgMusic = asHTMLElement('bgMusic') as HTMLAudioElement;
+  private colorChangeCallback?: (colorHex: number) => void;
+
+  public settings = {
+    color: parseInt(localStorage.getItem('xcaper.color') || '0x7ee787', 16),
+    sfxVol: parseInt(localStorage.getItem('xcaper.sfxVol') || '5', 10),
+    musicVol: parseInt(localStorage.getItem('xcaper.musicVol') || '5', 10),
+  };
 
   private statusShownAt = 0;
 
@@ -54,6 +69,110 @@ export class UISystem {
 
     this.optionsCloseBtn.addEventListener('click', () => {
       this.optionsModal.classList.add('hidden');
+    });
+
+    // Options UI setup
+    this.updateOptionsUI();
+    this.applyMusicVolume();
+
+    // Color Picker
+    this.colorBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLElement;
+        const colorStr = target.dataset.color;
+        if (colorStr) {
+          this.settings.color = parseInt(colorStr, 16);
+          localStorage.setItem('xcaper.color', colorStr);
+          this.updateOptionsUI();
+          if (this.colorChangeCallback) this.colorChangeCallback(this.settings.color);
+        }
+      });
+    });
+
+    // SFX Volume
+    this.sfxDecBtn.addEventListener('click', () => this.setSfxVol(this.settings.sfxVol - 1));
+    this.sfxIncBtn.addEventListener('click', () => this.setSfxVol(this.settings.sfxVol + 1));
+
+    // Music Volume
+    this.musicDecBtn.addEventListener('click', () => this.setMusicVol(this.settings.musicVol - 1));
+    this.musicIncBtn.addEventListener('click', () => this.setMusicVol(this.settings.musicVol + 1));
+    
+    // Autoplay policy workaround: Play music on first user interaction anywhere
+    const playMusicOnce = () => {
+      this.bgMusic.play().catch(() => {}); // Catch if still blocked
+      document.removeEventListener('click', playMusicOnce);
+    };
+    document.addEventListener('click', playMusicOnce);
+  }
+
+onPlayerColorChange(handler: (colorHex: number) => void): void {
+    this.colorChangeCallback = handler;
+  }
+
+  private setSfxVol(val: number) {
+    this.settings.sfxVol = Math.max(0, Math.min(10, val));
+    localStorage.setItem('xcaper.sfxVol', this.settings.sfxVol.toString());
+    this.updateOptionsUI();
+    
+    // Play the test sound with the newly selected volume
+    this.playTestBeep(this.settings.sfxVol);
+  }
+
+  private playTestBeep(volumeLevel: number): void {
+    if (volumeLevel === 0) return;
+
+    // Support standard and webkit prefixes
+    const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) {
+      return;
+    }
+
+    const audioCtx = new AudioCtx();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    // 440Hz is a standard, pleasant mid-range tone
+    osc.frequency.value = 880;
+    osc.type = 'triangle';
+    
+    // Scale the gain exactly how the game levels do it
+    const maxGain = 0.04;
+    gain.gain.value = maxGain * (volumeLevel / 10); 
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    
+    // Stop the beep after 150ms
+    setTimeout(() => {
+      osc.stop();
+      void audioCtx.close();
+    }, 200);
+  }
+
+  private setMusicVol(val: number) {
+    this.settings.musicVol = Math.max(0, Math.min(10, val));
+    localStorage.setItem('xcaper.musicVol', this.settings.musicVol.toString());
+    this.applyMusicVolume();
+    this.updateOptionsUI();
+  }
+
+  private applyMusicVolume() {
+    // Convert 0-10 linear scale to a 0.0 - 1.0 volume scale
+    this.bgMusic.volume = this.settings.musicVol / 10;
+  }
+
+  private updateOptionsUI() {
+    this.sfxVolLabel.textContent = this.settings.sfxVol.toString();
+    this.musicVolLabel.textContent = this.settings.musicVol.toString();
+    
+    const hexStr = `0x${this.settings.color.toString(16).padStart(6, '0')}`;
+    this.colorBtns.forEach(btn => {
+      if ((btn as HTMLElement).dataset.color === hexStr) {
+        btn.classList.add('selected');
+      } else {
+        btn.classList.remove('selected');
+      }
     });
   }
 

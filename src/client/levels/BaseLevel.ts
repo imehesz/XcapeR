@@ -452,7 +452,7 @@ export class BaseLevel {
     this.wasTouchingDoor = true;
   }
 
-  private playBeep(frequency: number, durationMs: number): void {
+  private playBeep_old(frequency: number, durationMs: number): void {
     const AudioCtx =
       window.AudioContext ||
       (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -466,6 +466,37 @@ export class BaseLevel {
     osc.frequency.value = frequency;
     osc.type = 'triangle';
     gain.gain.value = 0.04;
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    setTimeout(() => {
+      osc.stop();
+      void audioCtx.close();
+    }, durationMs);
+  }
+
+private playBeep(frequency: number, durationMs: number): void {
+    // If SFX volume is 0, don't play anything
+    const sfxVolSetting = this.deps.ui.settings.sfxVol;
+    if (sfxVolSetting === 0) return;
+
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) {
+      return;
+    }
+
+    const audioCtx = new AudioCtx();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc.frequency.value = frequency;
+    osc.type = 'triangle';
+    
+    // Convert 1-10 scale to the gain value. Max volume was originally 0.04.
+    // 10 = 0.04, 5 = 0.02, etc.
+    const maxGain = 0.04;
+    gain.gain.value = maxGain * (sfxVolSetting / 10); 
+    
     osc.connect(gain);
     gain.connect(audioCtx.destination);
     osc.start();

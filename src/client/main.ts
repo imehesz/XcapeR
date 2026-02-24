@@ -68,10 +68,20 @@ const sceneManager = new SceneManager(app);
 const inputManager = new InputManager(joystickEl, joystickKnobEl);
 const state = new GameStateManager();
 
+const playerMaterial = new THREE.MeshStandardMaterial({ 
+  color: ui.settings.color,
+  roughness: 0.65 
+});
+
 const player = new THREE.Mesh(
   new THREE.CapsuleGeometry(0.33, 0.65, 4, 8),
-  new THREE.MeshStandardMaterial({ color: 0x7ee787, roughness: 0.65 })
+  playerMaterial
 );
+
+ui.onPlayerColorChange((newColor) => {
+  playerMaterial.color.setHex(newColor);
+});
+
 player.add(createPlayerSunglasses());
 player.position.set(0, PLAYER_Y, 0);
 sceneManager.scene.add(player);
