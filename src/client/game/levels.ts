@@ -450,7 +450,37 @@ export const LEVELS: LevelConfig[] = [
         interaction: { type: 'ambient', touchRadius: 0.85 }
       }
     ]
-  }
+  },
+
+{
+    id: 'level-7',
+    name: 'The Mirror',
+    environment: {
+      roomHalf: 5,
+      wallHeight: 5,
+      wallColor: 0x4a617f,
+      wallOpacity: 0.24,
+      floorColor: 0x263142,
+      visibleWalls: { left: true, back: true, right: false, front: false },
+      lighting: {
+        ambientIntensity: 0.72,
+        directional: [
+          { color: 0xffffff, intensity: 0.75, position: { x: 7, y: 10, z: 4 } },
+          { color: 0x7aa7ff, intensity: 0.35, position: { x: -8, y: 6, z: -6 } }
+        ]
+      }
+    },
+    player: { spawn: { x: 0, z: 4.5 }, rotationY: 0, speed: 3.1, radius: 0.38 },
+    winCondition: { doorObjectId: 'door.exit', keysRequired: 1 },
+    objects: [
+      {
+        id: 'door.exit', type: 'door',
+        transform: { position: { x: 0, y: 0, z: -4.9 }, rotationY: 0, scale: 1 },
+        collision: { isCollidable: true, halfX: 0.95, halfZ: 0.42 },
+        interaction: { type: 'exit', touchRadius: 1.05 }
+      }
+    ]
+   }
 ];
 
 export const collectLevelAssetUrls = (levels: LevelConfig[]): string[] => {

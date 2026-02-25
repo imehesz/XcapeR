@@ -82,7 +82,7 @@ export class Level4 extends BaseLevel {
 
     this.sequence = this.createSequence();
     this.createPuzzleScene();
-    this.deps.ui.setStatus('Press the right button, memorize 9 colors, then paint the floor squares in order.');
+    this.deps.ui.setStatus('Find the key, leave the room.');
   }
 
   override teardown(): void {
