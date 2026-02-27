@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { LEVELS, collectLevelAssetUrls } from './game/levels';
+import { getEscapeLog, recordEscapeLogEntry } from './game/escapeLog';
 import { LevelController } from './game/LevelController';
 import { GameStateManager } from './systems/GameStateManager';
 import { InputManager } from './systems/InputManager';
@@ -93,6 +94,11 @@ const levelController = new LevelController(LEVELS, {
   state,
   playerMesh: player,
   onCompleted: (index) => {
+    recordEscapeLogEntry({
+      levelNumber: index + 1,
+      timeMs: state.getTimerValue(),
+      levelCount: TOTAL_LEVEL_SLOTS
+    });
     completedLevelIndexes.add(index);
     const nextUnlocked = Math.min(LEVELS.length, Math.max(maxUnlockedPlayableLevels, index + 2));
     if (nextUnlocked !== maxUnlockedPlayableLevels) {
@@ -148,6 +154,16 @@ const showLevelSelect = (): void => {
   ui.showLevelSelect();
 };
 
+const showEscapeLog = (): void => {
+  gameStarted = false;
+  ui.hideLevelComplete();
+  ui.renderEscapeLog({
+    totalSlots: TOTAL_LEVEL_SLOTS,
+    logsByLevel: getEscapeLog(TOTAL_LEVEL_SLOTS)
+  });
+  ui.showEscapeLog();
+};
+
 const startLevel = (levelIndex: number): void => {
   if (levelIndex < 0 || levelIndex >= maxUnlockedPlayableLevels || levelIndex >= LEVELS.length) {
     return;
@@ -168,6 +184,14 @@ ui.onOpenLevelSelect(() => {
 });
 
 ui.onLevelSelectBack(() => {
+  ui.showSplash();
+});
+
+ui.onOpenEscapeLog(() => {
+  showEscapeLog();
+});
+
+ui.onEscapeLogBack(() => {
   ui.showSplash();
 });
 

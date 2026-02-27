@@ -1,4 +1,5 @@
 import { formatTimer } from '../game/timer';
+import { type EscapeLogEntry } from '../game/escapeLog';
 import gameMusicUrl from '../../../assets/audio/game-music.mp3';
 
 type StatusTone = 'normal' | 'good';
@@ -18,7 +19,9 @@ export class UISystem {
   private readonly preloadHint = asHTMLElement('preloadHint');
   private readonly splash = asHTMLElement('splash');
   private readonly levelSelectScreen = asHTMLElement('levelSelectScreen');
+  private readonly escapeLogScreen = asHTMLElement('escapeLogScreen');
   private readonly levelSelectGrid = asHTMLElement('levelSelectGrid');
+  private readonly escapeLogContent = asHTMLElement('escapeLogContent');
   private readonly hud = asHTMLElement('hud');
   private readonly aboutModal = asHTMLElement('aboutModal');
   private readonly optionsModal = asHTMLElement('optionsModal');
@@ -30,6 +33,8 @@ export class UISystem {
   private readonly nextLevelBtn = asHTMLElement('nextLevelBtn');
   private readonly levelSelectBtn = asHTMLElement('levelSelectBtn');
   private readonly levelSelectBackBtn = asHTMLElement('levelSelectBackBtn');
+  private readonly escapeLogBtn = asHTMLElement('escapeLogBtn');
+  private readonly escapeLogBackBtn = asHTMLElement('escapeLogBackBtn');
   private readonly levelCompleteTitleEl = asHTMLElement('levelCompleteTitle');
   private readonly aboutCloseBtn = asHTMLElement('aboutCloseBtn');
   private readonly optionsCloseBtn = asHTMLElement('optionsCloseBtn');
@@ -198,6 +203,14 @@ onPlayerColorChange(handler: (colorHex: number) => void): void {
     this.levelSelectBackBtn.addEventListener('click', handler);
   }
 
+  onOpenEscapeLog(handler: () => void): void {
+    this.escapeLogBtn.addEventListener('click', handler);
+  }
+
+  onEscapeLogBack(handler: () => void): void {
+    this.escapeLogBackBtn.addEventListener('click', handler);
+  }
+
   onLevelSelected(handler: (index: number) => void): void {
     this.levelSelectGrid.addEventListener('click', (event) => {
       const target = event.target;
@@ -222,22 +235,36 @@ onPlayerColorChange(handler: (colorHex: number) => void): void {
   revealGame(): void {
     this.splash.classList.add('hidden');
     this.levelSelectScreen.classList.add('hidden');
+    this.escapeLogScreen.classList.add('hidden');
     this.hud.classList.remove('hidden');
   }
 
   showSplash(): void {
     this.splash.classList.remove('hidden');
     this.levelSelectScreen.classList.add('hidden');
+    this.escapeLogScreen.classList.add('hidden');
     this.hud.classList.add('hidden');
   }
 
   showLevelSelect(): void {
     this.splash.classList.add('hidden');
+    this.escapeLogScreen.classList.add('hidden');
     this.levelSelectScreen.classList.remove('hidden');
   }
 
   hideLevelSelect(): void {
     this.levelSelectScreen.classList.add('hidden');
+  }
+
+  showEscapeLog(): void {
+    this.splash.classList.add('hidden');
+    this.levelSelectScreen.classList.add('hidden');
+    this.escapeLogScreen.classList.remove('hidden');
+    this.hud.classList.add('hidden');
+  }
+
+  hideEscapeLog(): void {
+    this.escapeLogScreen.classList.add('hidden');
   }
 
   renderLevelSelect(params: {
@@ -282,6 +309,45 @@ onPlayerColorChange(handler: (colorHex: number) => void): void {
 
       levelBtn.append(label, note);
       this.levelSelectGrid.append(levelBtn);
+    }
+  }
+
+  renderEscapeLog(params: {
+    totalSlots: number;
+    logsByLevel: ReadonlyArray<ReadonlyArray<EscapeLogEntry>>;
+  }): void {
+    this.escapeLogContent.textContent = '';
+
+    for (let i = 0; i < params.totalSlots; i += 1) {
+      const section = document.createElement('section');
+      section.className = 'escape-log-level';
+
+      const heading = document.createElement('h3');
+      heading.className = 'escape-log-title';
+      heading.textContent = `LEVEL ${i + 1}`;
+
+      const table = document.createElement('table');
+      table.className = 'escape-log-table';
+
+      const thead = document.createElement('thead');
+      thead.innerHTML = '<tr><th>POSITION #</th><th>TIME</th><th>DATE</th></tr>';
+
+      const tbody = document.createElement('tbody');
+      const entries = params.logsByLevel[i] ?? [];
+      for (let rank = 0; rank < 5; rank += 1) {
+        const row = document.createElement('tr');
+        const entry = entries[rank];
+        row.innerHTML = `
+          <td>${rank + 1}</td>
+          <td>${entry ? formatTimer(entry.timeMs) : '-'}</td>
+          <td>${entry ? this.formatLogDate(entry.timestamp) : '-'}</td>
+        `;
+        tbody.append(row);
+      }
+
+      table.append(thead, tbody);
+      section.append(heading, table);
+      this.escapeLogContent.append(section);
     }
   }
 
@@ -336,5 +402,16 @@ onPlayerColorChange(handler: (colorHex: number) => void): void {
 
   hideLevelComplete(): void {
     this.levelCompleteModal.classList.add('hidden');
+  }
+
+  private formatLogDate(isoDate: string): string {
+    const date = new Date(isoDate);
+    return date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   }
 }

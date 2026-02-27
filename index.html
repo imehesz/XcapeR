@@ -100,6 +100,54 @@
         margin: 0.85rem 0 1rem;
       }
 
+      .screen-scroll {
+        align-items: flex-start;
+        overflow-y: auto;
+      }
+
+      .escape-log-panel {
+        width: min(52rem, 100%);
+      }
+
+      .escape-log-content {
+        display: grid;
+        gap: 1rem;
+        margin: 0.85rem 0 1rem;
+      }
+
+      .escape-log-level {
+        padding: 0.8rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .escape-log-title {
+        margin: 0 0 0.6rem;
+        text-align: center;
+        letter-spacing: 0.05em;
+      }
+
+      .escape-log-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .escape-log-table th,
+      .escape-log-table td {
+        text-align: center;
+        padding: 0.42rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        font-size: 0.84rem;
+      }
+
+      .escape-log-table th {
+        color: var(--muted);
+        letter-spacing: 0.04em;
+        font-size: 0.72rem;
+      }
+
       .level-slot {
         border: 1px solid rgba(255, 255, 255, 0.3);
         border-radius: 10px;
@@ -361,6 +409,7 @@
         <p id="splashSubtitle" class="subtitle">by [XOR] Games</p>
         <div class="menu">
           <button id="startBtn" class="btn btn-primary">Start Game</button>
+          <button id="escapeLogBtn" class="btn">Escape Log</button>
           <button id="aboutBtn" class="btn">About</button>
           <button id="optionsBtn" class="btn">Options</button>
         </div>
@@ -374,6 +423,17 @@
         <div id="levelSelectGrid" class="levels-grid"></div>
         <div class="menu">
           <button id="levelSelectBackBtn" class="btn">Back</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="escapeLogScreen" class="screen screen-scroll hidden">
+      <div class="panel escape-log-panel">
+        <h2 class="title" style="font-size: 1.55rem">Escape Log</h2>
+        <p class="subtitle">Top 5 fastest solves per level.</p>
+        <div id="escapeLogContent" class="escape-log-content"></div>
+        <div class="menu">
+          <button id="escapeLogBackBtn" class="btn btn-primary">Back</button>
         </div>
       </div>
     </div>
