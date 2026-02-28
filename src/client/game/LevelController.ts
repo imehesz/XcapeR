@@ -8,6 +8,7 @@ import { Level5 } from '../levels/Level5';
 import { Level6 } from '../levels/Level6';
 import { Level7 } from '../levels/Level7';
 import { Level8 } from '../levels/Level8';
+import { Level9 } from '../levels/Level9';
 
 export class LevelController {
   private readonly levels: LevelConfig[];
@@ -85,6 +86,8 @@ export class LevelController {
         return new Level7(config, this.deps);
       case 'level-8':
         return new Level8(config, this.deps);
+      case 'level-9':
+        return new Level9(config, this.deps);
       default:
         return new BaseLevel(config, this.deps);
     }
